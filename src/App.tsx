@@ -1122,8 +1122,7 @@ export default function App() {
   async function handleSendTestEntryPass() {
     try {
       if (!paidRows || paidRows.length === 0) {
-        alert("No paid participants to base the test pass on.
-");
+        alert("No paid participants to base the test pass on.");
         return;
       }
       const testTo = (entryPassTestRecipient || "").trim();
