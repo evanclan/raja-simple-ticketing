@@ -1,6 +1,139 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "./lib/supabaseClient";
 
+function CheckinsView() {
+  const supabaseClient = supabase;
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string>("");
+  const [rows, setRows] = useState<
+    Array<{
+      row_hash: string;
+      checked_in_at: string;
+      row_number: number | null;
+      name: string;
+      email: string;
+    }>
+  >([]);
+
+  const EMAIL_REGEX = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
+  function detectEmail(headers: string[] | null | undefined, data: Record<string, any>): string | "" {
+    const candidates = (headers || []).map((h) => String(h || ""));
+    const lower = candidates.map((h) => h.toLowerCase());
+    const patterns = ["email", "e-mail", "mail", "メール", "メールアドレス"];
+    for (let i = 0; i < candidates.length; i++) {
+      const h = lower[i];
+      if (patterns.some((p) => h.includes(p))) {
+        const key = candidates[i];
+        const val = data?.[key];
+        if (typeof val === "string" && EMAIL_REGEX.test(val)) return val.trim();
+      }
+    }
+    for (const v of Object.values(data || {})) {
+      if (typeof v === "string" && EMAIL_REGEX.test(v)) return v.trim();
+    }
+    return "";
+  }
+  function detectName(headers: string[] | null | undefined, data: Record<string, any>): string {
+    const candidates = (headers || []).map((h) => String(h || ""));
+    const patterns = ["代表者氏名", "代表者", "氏名", "お名前", "名前", "name", "申込者"];
+    for (const key of candidates) {
+      const k = String(key || "").toLowerCase();
+      if (patterns.some((p) => k.includes(p.toLowerCase()))) {
+        const v = data?.[key];
+        if (v) return String(v);
+      }
+    }
+    return "";
+  }
+
+  useEffect(() => {
+    (async () => {
+      try {
+        setLoading(true);
+        setError("");
+        const { data: checkins, error: cErr } = await supabaseClient
+          .from("checkins")
+          .select("row_hash, checked_in_at")
+          .order("checked_in_at", { ascending: false });
+        if (cErr) throw cErr;
+        const list = (checkins || []) as Array<{ row_hash: string; checked_in_at: string }>;
+        if (list.length === 0) {
+          setRows([]);
+          return;
+        }
+        const hashes = Array.from(new Set(list.map((c) => c.row_hash)));
+        const { data: participants, error: pErr } = await supabaseClient
+          .from("paidparticipants")
+          .select("row_hash, row_number, headers, data")
+          .in("row_hash", hashes);
+        if (pErr) throw pErr;
+        const map = new Map<string, { row_number: number; headers: string[]; data: Record<string, any> }>();
+        for (const r of participants || []) {
+          map.set(
+            (r as any).row_hash as string,
+            {
+              row_number: (r as any).row_number as number,
+              headers: ((r as any).headers as string[]) || [],
+              data: ((r as any).data as Record<string, any>) || {},
+            }
+          );
+        }
+        const merged = list.map((c) => {
+          const p = map.get(c.row_hash);
+          const row_number = p?.row_number ?? null;
+          const name = p ? detectName(p.headers, p.data) : "";
+          const email = p ? detectEmail(p.headers, p.data) : "";
+          return { row_hash: c.row_hash, checked_in_at: c.checked_in_at, row_number, name, email };
+        });
+        setRows(merged);
+      } catch (e: any) {
+        setError(e?.message || String(e));
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [supabaseClient]);
+
+  return (
+    <div className="rounded-lg border bg-white p-6 shadow-sm">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-lg font-semibold">Checked-in participants</h2>
+        <span className="text-sm text-gray-600">Total: {rows.length}</span>
+      </div>
+      {loading ? (
+        <div className="text-gray-600">Loading…</div>
+      ) : error ? (
+        <div className="rounded border border-red-300 bg-red-50 p-3 text-red-800">{error}</div>
+      ) : rows.length === 0 ? (
+        <div className="text-gray-600">No check-ins yet.</div>
+      ) : (
+        <div className="overflow-auto border rounded">
+          <table className="min-w-full text-sm">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">Checked-in at</th>
+                <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">#</th>
+                <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">Name</th>
+                <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">Email</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.row_hash} className="odd:bg-white even:bg-gray-50">
+                  <td className="px-3 py-2 text-gray-800 whitespace-nowrap">{new Date(r.checked_in_at).toLocaleString()}</td>
+                  <td className="px-3 py-2 text-gray-800 whitespace-nowrap">{r.row_number ?? "-"}</td>
+                  <td className="px-3 py-2 text-gray-800 whitespace-nowrap">{r.name}</td>
+                  <td className="px-3 py-2 text-gray-800 whitespace-nowrap">{r.email}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function EntryPassView({ token }: { token: string }) {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
   const supabaseAnon = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
@@ -199,6 +332,13 @@ export default function App() {
       return m ? decodeURIComponent(m[1]) : null;
     } catch {
       return null;
+    }
+  }, []);
+  const isCheckinsRoute = useMemo(() => {
+    try {
+      return (window.location.pathname || "") === "/checkins";
+    } catch {
+      return false;
     }
   }, []);
   // Auth state
@@ -1191,16 +1331,32 @@ export default function App() {
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
       <header className="border-b bg-white">
-        <div className="mx-auto max-w-5xl px-4 py-4">
+        <div className="mx-auto max-w-5xl px-4 py-4 flex items-center justify-between">
           <h1 className="text-xl font-semibold">New Simple ticketing</h1>
+          <nav className="flex items-center gap-2 text-sm">
+            <button
+              onClick={() => (window.location.href = "/")}
+              className="rounded border px-3 py-1 text-gray-700 hover:bg-gray-50"
+            >
+              Dashboard
+            </button>
+            <button
+              onClick={() => (window.location.href = "/checkins")}
+              className="rounded border px-3 py-1 text-gray-700 hover:bg-gray-50"
+            >
+              Checked-in
+            </button>
+          </nav>
         </div>
       </header>
       <main className="mx-auto max-w-5xl px-4 py-10 space-y-6">
-        <div className="rounded-lg border bg-white p-6 shadow-sm">
-          <p className="text-gray-600">
-            Vite + React + Tailwind + Supabase is ready.
-          </p>
-        </div>
+        {!isCheckinsRoute && (
+          <div className="rounded-lg border bg-white p-6 shadow-sm">
+            <p className="text-gray-600">
+              Vite + React + Tailwind + Supabase is ready.
+            </p>
+          </div>
+        )}
 
         {isAuthLoading ? (
           <div className="rounded-lg border bg-white p-6 shadow-sm">
@@ -1208,7 +1364,8 @@ export default function App() {
           </div>
         ) : userEmail ? (
           <div className="rounded-lg border bg-white p-6 shadow-sm">
-            <div className="mb-4 flex items-center justify-between">
+            {!isCheckinsRoute && (
+              <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold">
                 Sync participants from Google Sheets
               </h2>
@@ -1221,8 +1378,11 @@ export default function App() {
                   Sign out
                 </button>
               </div>
-            </div>
-            {activePage === "editMail" ? (
+              </div>
+            )}
+            {isCheckinsRoute ? (
+              <CheckinsView />
+            ) : activePage === "editMail" ? (
               <div className="grid gap-4">
                 <div className="flex items-center justify-between">
                   <h3 className="font-medium">Edit Auto Mail</h3>
