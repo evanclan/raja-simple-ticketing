@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/pass/(.*)", "destination": "/" },
+    { "source": "/(.*)", "destination": "/" }
+  ]
+}

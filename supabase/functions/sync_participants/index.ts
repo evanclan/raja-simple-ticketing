@@ -1,0 +1,354 @@
+// deno-lint-ignore-file no-explicit-any
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import { importPKCS8, SignJWT } from "https://esm.sh/jose@5.9.6";
+
+type SheetSyncRequest = {
+  sheetId: string;
+  range?: string; // e.g. "Sheet1!A:Z"
+};
+
+const SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets.readonly";
+const corsHeaders: Record<string, string> = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+async function sha256Hex(input: string): Promise<string> {
+  const data = new TextEncoder().encode(input);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  const bytes = new Uint8Array(digest);
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+async function getAccessTokenFromServiceAccount(): Promise<string> {
+  const clientEmail = Deno.env.get("GOOGLE_CLIENT_EMAIL");
+  const privateKeyRaw = Deno.env.get("GOOGLE_PRIVATE_KEY");
+  if (!clientEmail || !privateKeyRaw) {
+    throw new Error("Missing GOOGLE_CLIENT_EMAIL or GOOGLE_PRIVATE_KEY");
+  }
+  const privateKey = privateKeyRaw.replace(/\\n/g, "\n");
+  const key = await importPKCS8(privateKey, "RS256");
+  const now = Math.floor(Date.now() / 1000);
+  const assertion = await new SignJWT({ scope: SHEETS_SCOPE })
+    .setProtectedHeader({ alg: "RS256", typ: "JWT" })
+    .setIssuer(clientEmail)
+    .setSubject(clientEmail)
+    .setAudience("https://oauth2.googleapis.com/token")
+    .setIssuedAt(now)
+    .setExpirationTime(now + 3600)
+    .sign(key as CryptoKey);
+
+  const body = new URLSearchParams();
+  body.set("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer");
+  body.set("assertion", assertion);
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Google token exchange failed: ${err}`);
+  }
+  const json = await res.json();
+  return json.access_token as string;
+}
+
+async function fetchSheetValues(
+  sheetId: string,
+  range: string
+): Promise<{ headers: string[]; rows: string[][] }> {
+  const apiKey = Deno.env.get("GOOGLE_API_KEY");
+  const hasSvcCreds = Boolean(
+    Deno.env.get("GOOGLE_CLIENT_EMAIL") && Deno.env.get("GOOGLE_PRIVATE_KEY")
+  );
+
+  let values: string[][] = [];
+  // Prefer service account for private sheets
+  if (hasSvcCreds) {
+    const accessToken = await getAccessTokenFromServiceAccount();
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(
+      range
+    )}`;
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(
+        `Sheets API (service account) error for sheetId='${sheetId}' range='${range}': ${err}`
+      );
+    }
+    const data = await res.json();
+    values = data.values ?? [];
+  } else if (apiKey) {
+    const url = new URL(
+      `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(
+        range
+      )}`
+    );
+    url.searchParams.set("key", apiKey);
+    const res = await fetch(url);
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(
+        `Sheets API (API key) error for sheetId='${sheetId}' range='${range}': ${err}`
+      );
+    }
+    const data = await res.json();
+    values = data.values ?? [];
+  } else {
+    throw new Error(
+      "Missing Google credentials: set GOOGLE_CLIENT_EMAIL and GOOGLE_PRIVATE_KEY for private sheets, or GOOGLE_API_KEY for public sheets"
+    );
+  }
+
+  if (values.length === 0) {
+    return { headers: [], rows: [] };
+  }
+  const headers = (values[0] ?? []).map((h: string) => (h ?? "").trim());
+  const rows = values.slice(1);
+  return { headers, rows };
+}
+
+async function getFirstSheetTitle(sheetId: string): Promise<string> {
+  const apiKey = Deno.env.get("GOOGLE_API_KEY");
+  const hasSvcCreds = Boolean(
+    Deno.env.get("GOOGLE_CLIENT_EMAIL") && Deno.env.get("GOOGLE_PRIVATE_KEY")
+  );
+
+  if (hasSvcCreds) {
+    const accessToken = await getAccessTokenFromServiceAccount();
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}?fields=sheets(properties(title,hidden))`;
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(
+        `Sheets API (service account) spreadsheet get error for sheetId='${sheetId}': ${err}`
+      );
+    }
+    const data = await res.json();
+    const sheets = (data?.sheets ?? []) as Array<{
+      properties?: { title?: string; hidden?: boolean };
+    }>;
+    const firstVisible = sheets.find((s) => !s?.properties?.hidden);
+    const title =
+      firstVisible?.properties?.title ?? sheets[0]?.properties?.title;
+    if (!title) throw new Error("No sheets found in spreadsheet");
+    return title as string;
+  } else if (apiKey) {
+    const url = new URL(
+      `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}`
+    );
+    url.searchParams.set("fields", "sheets(properties(title,hidden))");
+    url.searchParams.set("key", apiKey);
+    const res = await fetch(url);
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(
+        `Sheets API (API key) spreadsheet get error for sheetId='${sheetId}': ${err}`
+      );
+    }
+    const data = await res.json();
+    const sheets = (data?.sheets ?? []) as Array<{
+      properties?: { title?: string; hidden?: boolean };
+    }>;
+    const firstVisible = sheets.find((s) => !s?.properties?.hidden);
+    const title =
+      firstVisible?.properties?.title ?? sheets[0]?.properties?.title;
+    if (!title) throw new Error("No sheets found in spreadsheet");
+    return title as string;
+  } else {
+    throw new Error(
+      "Missing Google credentials: set GOOGLE_CLIENT_EMAIL and GOOGLE_PRIVATE_KEY for private sheets, or GOOGLE_API_KEY for public sheets"
+    );
+  }
+}
+
+function mapRowToObject(headers: string[], row: string[]): Record<string, any> {
+  const obj: Record<string, any> = {};
+  headers.forEach((header, idx) => {
+    obj[header || `col_${idx + 1}`] = row[idx] ?? null;
+  });
+  return obj;
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Method not allowed" }), {
+      status: 405,
+      headers: corsHeaders,
+    });
+  }
+
+  try {
+    const payload = await req.json();
+    const action = (payload?.action as string | undefined) ?? "sync";
+    const sheetId = (payload?.sheetId as string | undefined) ?? "";
+    const rangeInput = (payload?.range as string | undefined) ?? "";
+
+    const url = Deno.env.get("SUPABASE_URL")!;
+    const serviceRole =
+      Deno.env.get("SERVICE_ROLE_KEY") ??
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ??
+      Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabase = createClient(url, serviceRole);
+
+    if (action === "clear") {
+      const { error } = await supabase
+        .from("sheet_participants")
+        .delete()
+        .neq("row_hash", "");
+      if (error) throw error;
+      return new Response(JSON.stringify({ ok: true, cleared: true }), {
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
+
+    if (action === "clear_paid") {
+      const { error } = await supabase
+        .from("paidparticipants")
+        .delete()
+        .neq("row_hash", "");
+      if (error) throw error;
+      return new Response(JSON.stringify({ ok: true, clearedPaid: true }), {
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
+
+    if (action === "clear_all") {
+      const { error: err1 } = await supabase
+        .from("sheet_participants")
+        .delete()
+        .neq("row_hash", "");
+      if (err1) throw err1;
+      const { error: err2 } = await supabase
+        .from("paidparticipants")
+        .delete()
+        .neq("row_hash", "");
+      if (err2) throw err2;
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          clearedParticipants: true,
+          clearedPaid: true,
+        }),
+        { headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    if (action === "counts") {
+      const { count: participantsCount, error: c1 } = await supabase
+        .from("sheet_participants")
+        .select("row_hash", { count: "exact", head: true });
+      if (c1) throw c1;
+      const { count: paidCount, error: c2 } = await supabase
+        .from("paidparticipants")
+        .select("row_hash", { count: "exact", head: true });
+      if (c2) throw c2;
+      return new Response(
+        JSON.stringify({ ok: true, participantsCount, paidCount }),
+        { headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    if (!sheetId) {
+      return new Response(JSON.stringify({ error: "sheetId is required" }), {
+        status: 400,
+        headers: corsHeaders,
+      });
+    }
+    // Determine effective range:
+    // - If no range provided: use the first visible sheet title (all used cells)
+    // - If range provided without a sheet name (no '!'): prefix with first sheet title
+    // - Else: use the provided range as-is
+    let effectiveRange: string;
+    if (!rangeInput || rangeInput.trim().length === 0) {
+      const firstTitle = await getFirstSheetTitle(sheetId);
+      effectiveRange = firstTitle; // full used cells in first sheet
+    } else if (!rangeInput.includes("!")) {
+      const firstTitle = await getFirstSheetTitle(sheetId);
+      effectiveRange = `${firstTitle}!${rangeInput.trim()}`;
+    } else {
+      effectiveRange = rangeInput.trim();
+    }
+
+    const { headers, rows } = await fetchSheetValues(sheetId, effectiveRange);
+
+    type Payload = {
+      row_hash: string;
+      row_number: number;
+      headers: string[];
+      data: Record<string, any>;
+    };
+    // Preserve duplicates within the same sheet by including row_number in the hash
+    const upsertPayload: Payload[] = [];
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const obj = mapRowToObject(headers, row);
+      const rowNumber = i + 2; // account for header row
+      const rowHash = await sha256Hex(JSON.stringify({ rowNumber, data: obj }));
+      upsertPayload.push({
+        row_hash: rowHash,
+        row_number: rowNumber,
+        headers,
+        data: obj,
+      });
+    }
+
+    let rowsUpserted = 0;
+    // If replacing, clear tables first (after we've successfully fetched/parsed rows)
+    if (action === "replace") {
+      const { error: clearParticipantsErr } = await supabase
+        .from("sheet_participants")
+        .delete()
+        .neq("row_hash", "");
+      if (clearParticipantsErr) throw clearParticipantsErr;
+      // Also clear paid list to reset when switching to a new sheet
+      const { error: clearPaidErr } = await supabase
+        .from("paidparticipants")
+        .delete()
+        .neq("row_hash", "");
+      if (clearPaidErr) throw clearPaidErr;
+    }
+    if (upsertPayload.length > 0) {
+      const CHUNK_SIZE = 500;
+      for (let i = 0; i < upsertPayload.length; i += CHUNK_SIZE) {
+        const chunk = upsertPayload.slice(i, i + CHUNK_SIZE);
+        const { error } = await supabase
+          .from("sheet_participants")
+          .upsert(chunk, { onConflict: "row_hash", ignoreDuplicates: true });
+        if (error) throw error;
+        rowsUpserted += chunk.length;
+      }
+    }
+
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        rowsFetched: rows.length,
+        rowsUpserted,
+        rowsSkipped: 0,
+      }),
+      { headers: { "Content-Type": "application/json", ...corsHeaders } }
+    );
+  } catch (err: any) {
+    return new Response(
+      JSON.stringify({ error: err?.message ?? String(err) }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      }
+    );
+  }
+});
