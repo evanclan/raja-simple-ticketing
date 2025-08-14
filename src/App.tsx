@@ -1582,7 +1582,7 @@ export default function App() {
                         >
                           Refresh
                         </button>
-                        <div className="hidden sm:flex items-center gap-2">
+                        <div className="flex items-center gap-2">
                           <input
                             type="email"
                             value={entryPassTestRecipient}
