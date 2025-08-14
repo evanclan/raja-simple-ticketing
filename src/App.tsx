@@ -282,6 +282,10 @@ export default function App() {
   });
   const [isBulkSendingPasses, setIsBulkSendingPasses] =
     useState<boolean>(false);
+  const [entryPassTestRecipient, setEntryPassTestRecipient] =
+    useState<string>("eoalferez@gmail.com");
+  const [isSendingTestPass, setIsSendingTestPass] =
+    useState<boolean>(false);
 
   // Calculation module state
   const [calcLoading, setCalcLoading] = useState<boolean>(false);
@@ -1115,6 +1119,51 @@ export default function App() {
     }
   }
 
+  async function handleSendTestEntryPass() {
+    try {
+      if (!paidRows || paidRows.length === 0) {
+        alert("No paid participants to base the test pass on.
+");
+        return;
+      }
+      const testTo = (entryPassTestRecipient || "").trim();
+      if (!testTo) {
+        alert("Enter a test recipient email");
+        return;
+      }
+      setIsSendingTestPass(true);
+      const baseUrl = window.location.origin;
+      const row = paidRows[0];
+      const resp = await fetch(`${supabaseUrl}/functions/v1/entry_pass`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: supabaseAnon,
+          Authorization: `Bearer ${supabaseAnon}`,
+        },
+        body: JSON.stringify({
+          action: "send_email",
+          row_hash: row.row_hash,
+          baseUrl,
+          from: fromDisplay,
+          to: testTo,
+        }),
+      });
+      if (!resp.ok) {
+        const txt = await resp.text();
+        throw new Error(`HTTP ${resp.status}: ${txt}`);
+      }
+      const data = await resp.json();
+      setResultMessage(
+        `Test entry pass sent to ${testTo}. Link: ${data?.url ?? "(hidden)"}`
+      );
+    } catch (e: any) {
+      alert(e?.message || String(e));
+    } finally {
+      setIsSendingTestPass(false);
+    }
+  }
+
   async function handleSignIn(e: React.FormEvent) {
     e.preventDefault();
     setAuthError("");
@@ -1533,6 +1582,22 @@ export default function App() {
                         >
                           Refresh
                         </button>
+                        <div className="hidden sm:flex items-center gap-2">
+                          <input
+                            type="email"
+                            value={entryPassTestRecipient}
+                            onChange={(e) => setEntryPassTestRecipient(e.target.value)}
+                            placeholder="test@example.com"
+                            className="rounded border px-2 py-1 text-sm"
+                          />
+                          <button
+                            onClick={handleSendTestEntryPass}
+                            disabled={isSendingTestPass}
+                            className="rounded border px-3 py-1 text-sm text-fuchsia-700 border-fuchsia-300 bg-fuchsia-50 hover:bg-fuchsia-100 disabled:opacity-50"
+                          >
+                            {isSendingTestPass ? "Sending…" : "Send test entry pass"}
+                          </button>
+                        </div>
                         <button
                           onClick={handleBulkSendPasses}
                           disabled={isBulkSendingPasses}
