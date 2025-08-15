@@ -9,12 +9,29 @@ type SheetSyncRequest = {
 };
 
 const SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets.readonly";
-const corsHeaders: Record<string, string> = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+
+function getCorsHeaders(origin: string | null): Record<string, string> {
+  const base: Record<string, string> = {
+    "Access-Control-Allow-Headers":
+      "authorization, x-client-info, apikey, content-type, x-admin-secret",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+  };
+  const allowList = (Deno.env.get("CORS_ALLOW_ORIGINS") || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (origin && allowList.length > 0 && allowList.includes(origin)) {
+    return { ...base, "Access-Control-Allow-Origin": origin };
+  }
+  const publicUrl = Deno.env.get("PUBLIC_APP_URL") || "";
+  try {
+    if (publicUrl) {
+      const o = new URL(publicUrl).origin;
+      return { ...base, "Access-Control-Allow-Origin": o };
+    }
+  } catch {}
+  return { ...base, "Access-Control-Allow-Origin": "*" };
+}
 
 async function sha256Hex(input: string): Promise<string> {
   const data = new TextEncoder().encode(input);
@@ -180,7 +197,38 @@ function mapRowToObject(headers: string[], row: string[]): Record<string, any> {
   return obj;
 }
 
+async function requireAdmin(req: Request): Promise<void> {
+  const adminSecret = Deno.env.get("ADMIN_SECRET");
+  const secretHeader = req.headers.get("x-admin-secret");
+  if (adminSecret && secretHeader && secretHeader === adminSecret) return;
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  if (!supabaseUrl || !anonKey) throw new Error("Server misconfigured");
+
+  const authHeader = req.headers.get("authorization") || "";
+  const token = authHeader.replace(/^Bearer\s+/i, "");
+  if (!token || token === anonKey) throw new Error("Unauthorized");
+
+  const userClient = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  });
+  const { data, error } = await userClient.auth.getUser();
+  if (error || !data?.user) throw new Error("Unauthorized");
+
+  const allowed = (Deno.env.get("ADMIN_EMAILS") || "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  if (allowed.length > 0) {
+    const email = (data.user.email || "").toLowerCase();
+    if (!allowed.includes(email)) throw new Error("Forbidden");
+  }
+}
+
 Deno.serve(async (req) => {
+  const origin = req.headers.get("Origin");
+  const corsHeaders = getCorsHeaders(origin);
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -192,6 +240,8 @@ Deno.serve(async (req) => {
   }
 
   try {
+    await requireAdmin(req);
+
     const payload = await req.json();
     const action = (payload?.action as string | undefined) ?? "sync";
     const sheetId = (payload?.sheetId as string | undefined) ?? "";
@@ -201,7 +251,8 @@ Deno.serve(async (req) => {
     const serviceRole =
       Deno.env.get("SERVICE_ROLE_KEY") ??
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ??
-      Deno.env.get("SUPABASE_ANON_KEY")!;
+      "";
+    if (!serviceRole) throw new Error("Missing service role key");
     const supabase = createClient(url, serviceRole);
 
     if (action === "clear") {
@@ -247,35 +298,24 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (action === "counts") {
-      const { count: participantsCount, error: c1 } = await supabase
-        .from("sheet_participants")
-        .select("row_hash", { count: "exact", head: true });
-      if (c1) throw c1;
-      const { count: paidCount, error: c2 } = await supabase
-        .from("paidparticipants")
-        .select("row_hash", { count: "exact", head: true });
-      if (c2) throw c2;
-      return new Response(
-        JSON.stringify({ ok: true, participantsCount, paidCount }),
-        { headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
-
     if (!sheetId) {
       return new Response(JSON.stringify({ error: "sheetId is required" }), {
         status: 400,
         headers: corsHeaders,
       });
     }
-    // Determine effective range:
-    // - If no range provided: use the first visible sheet title (all used cells)
-    // - If range provided without a sheet name (no '!'): prefix with first sheet title
-    // - Else: use the provided range as-is
+    if (!/^[\w-]+$/.test(sheetId)) {
+      return new Response(JSON.stringify({ error: "Invalid sheetId" }), {
+        status: 400,
+        headers: corsHeaders,
+      });
+    }
+
+    // Determine effective range
     let effectiveRange: string;
     if (!rangeInput || rangeInput.trim().length === 0) {
       const firstTitle = await getFirstSheetTitle(sheetId);
-      effectiveRange = firstTitle; // full used cells in first sheet
+      effectiveRange = firstTitle;
     } else if (!rangeInput.includes("!")) {
       const firstTitle = await getFirstSheetTitle(sheetId);
       effectiveRange = `${firstTitle}!${rangeInput.trim()}`;
@@ -347,7 +387,7 @@ Deno.serve(async (req) => {
       JSON.stringify({ error: err?.message ?? String(err) }),
       {
         status: 500,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
+        headers: { "Content-Type": "application/json", ...getCorsHeaders(req.headers.get("Origin")) },
       }
     );
   }
