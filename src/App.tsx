@@ -701,7 +701,7 @@ export default function App() {
   const [sheetId, setSheetId] = useState<string>(
     "1he2VxMHqmTs_gIdu-vtel77h9ISFAZa2GfK629Rd9IU"
   );
-  const [range] = useState<string>("");
+  const [range] = useState<string>("フォームの回答 1!A:Z");
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [resultMessage, setResultMessage] = useState<string>("");
 
