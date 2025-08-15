@@ -706,6 +706,7 @@ export default function App() {
   const [resultMessage, setResultMessage] = useState<string>("");
 
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+  const [resendOk, setResendOk] = useState<boolean | null>(null);
 
   // Participants view state
   const [tableHeaders, setTableHeaders] = useState<string[]>([]);
@@ -865,6 +866,20 @@ export default function App() {
       } catch {}
     }
   }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const resp = await fetch(`${supabaseUrl}/functions/v1/resend_health`, {
+          method: "GET",
+        });
+        const json = await resp.json().catch(() => ({} as any));
+        setResendOk(Boolean(json?.ok));
+      } catch {
+        setResendOk(false);
+      }
+    })();
+  }, [supabaseUrl]);
 
   const isDisabled = useMemo(() => isSyncing, [isSyncing]);
 
@@ -1724,7 +1739,7 @@ export default function App() {
                 <span className="text-sm text-gray-800">Supabase</span>
               </li>
               <li className="flex items-center gap-2">
-                <span className="inline-flex h-2.5 w-2.5 rounded-full bg-yellow-400 animate-pulse"></span>
+                <span className={`inline-flex h-2.5 w-2.5 rounded-full ${resendOk === null ? "bg-yellow-400 animate-pulse" : resendOk ? "bg-emerald-500" : "bg-red-500"}`}></span>
                 <span className="text-sm text-gray-800">Resender</span>
               </li>
               <li className="flex items-center gap-2">
