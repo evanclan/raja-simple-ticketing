@@ -497,12 +497,6 @@ function EntryPassView({ token }: { token: string }) {
                       })()}
                     </td>
                   </tr>
-                  <tr>
-                    <td className="px-3 py-2 text-gray-600 whitespace-nowrap">data</td>
-                    <td className="px-3 py-2 text-gray-900 whitespace-pre-wrap break-all">
-                      {JSON.stringify(participant.data)}
-                    </td>
-                  </tr>
                 </tbody>
               </table>
             </div>
