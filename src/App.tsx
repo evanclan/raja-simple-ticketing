@@ -8,15 +8,17 @@ function CheckinsView() {
   const [rows, setRows] = useState<
     Array<{
       row_hash: string;
-      checked_in_at: string;
-      row_number: number | null;
-      name: string;
       email: string;
+      name: string;
+      category: string;
+      adult: number;
+      child: number;
+      infant: number;
     }>
   >([]);
 
   const EMAIL_REGEX = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
-  function detectEmail(headers: string[] | null | undefined, data: Record<string, any>): string | "" {
+  function detectEmail(headers: string[] | null | undefined, data: Record<string, any>): string {
     const candidates = (headers || []).map((h) => String(h || ""));
     const lower = candidates.map((h) => h.toLowerCase());
     const patterns = ["email", "e-mail", "mail", "メール", "メールアドレス"];
@@ -44,6 +46,82 @@ function CheckinsView() {
       }
     }
     return "";
+  }
+  function detectCategory(headers: string[] | null | undefined, data: Record<string, any>): string {
+    const candidates = (headers || []).map((h) => String(h || ""));
+    const patterns = ["参加区分", "区分", "参加", "カテゴリ", "カテゴリー", "category", "type"];
+    for (const key of candidates) {
+      const k = String(key || "").toLowerCase();
+      if (patterns.some((p) => k.includes(p.toLowerCase()))) {
+        const v = data?.[key];
+        if (v != null) return String(v);
+      }
+    }
+    return "";
+  }
+  function detectAdultKey(headers: string[] | null | undefined): string | null {
+    const list = (headers || []).map((h) => String(h || ""));
+    for (const header of list) {
+      const h = header.toLowerCase();
+      if (
+        ["おとな", "大人", "成人", "中学生以上", "おとな参加人数", "adult"].some((p) =>
+          h.includes(p)
+        )
+      )
+        return header;
+    }
+    return null;
+  }
+  function detectChildKey(headers: string[] | null | undefined): string | null {
+    const list = (headers || []).map((h) => String(h || ""));
+    for (const header of list) {
+      const h = header.toLowerCase();
+      if (
+        ["こども", "子ども", "子供", "小学生", "年少", "こども参加人数", "child"].some((p) =>
+          h.includes(p)
+        )
+      )
+        return header;
+    }
+    return null;
+  }
+  function detectInfantKey(headers: string[] | null | undefined): string | null {
+    const list = (headers || []).map((h) => String(h || ""));
+    for (const header of list) {
+      const h = header.toLowerCase();
+      if (
+        ["年少々以下", "未就学", "幼児", "乳幼児", "未就園"].some((p) =>
+          h.includes(p)
+        )
+      )
+        return header;
+    }
+    return null;
+  }
+  function normalizeDigits(input: string): string {
+    if (!input) return "";
+    return input.replace(/[\uFF10-\uFF19]/g, (d) => String(d.charCodeAt(0) - 0xff10));
+  }
+  function parseCount(value: unknown): number {
+    if (value == null) return 0;
+    const text = normalizeDigits(String(value));
+    const match = text.match(/(\d+)/);
+    if (!match) return 0;
+    const n = parseInt(match[1], 10);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  async function handleRemove(row_hash: string) {
+    if (!confirm("Remove this check-in?")) return;
+    const { error: delErr } = await supabaseClient
+      .from("checkins")
+      .delete()
+      .eq("row_hash", row_hash);
+    if (delErr) {
+      alert(delErr.message || String(delErr));
+      return;
+    }
+    setRows((prev) => prev.filter((r) => r.row_hash !== row_hash));
   }
 
   useEffect(() => {
@@ -80,10 +158,18 @@ function CheckinsView() {
         }
         const merged = list.map((c) => {
           const p = map.get(c.row_hash);
-          const row_number = p?.row_number ?? null;
-          const name = p ? detectName(p.headers, p.data) : "";
-          const email = p ? detectEmail(p.headers, p.data) : "";
-          return { row_hash: c.row_hash, checked_in_at: c.checked_in_at, row_number, name, email };
+          const headers = p?.headers || [];
+          const data = p?.data || {};
+          const email = detectEmail(headers, data);
+          const name = detectName(headers, data);
+          const category = detectCategory(headers, data);
+          const adultKey = detectAdultKey(headers);
+          const childKey = detectChildKey(headers);
+          const infantKey = detectInfantKey(headers);
+          const adult = parseCount(adultKey ? data[adultKey] : undefined);
+          const child = parseCount(childKey ? data[childKey] : undefined);
+          const infant = parseCount(infantKey ? data[infantKey] : undefined);
+          return { row_hash: c.row_hash, email, name, category, adult, child, infant };
         });
         setRows(merged);
       } catch (e: any) {
@@ -111,19 +197,32 @@ function CheckinsView() {
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">Checked-in at</th>
-                <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">#</th>
-                <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">Name</th>
-                <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">Email</th>
+                <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">メールアドレス</th>
+                <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">代表者氏名</th>
+                <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">参加区分</th>
+                <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">おとな参加人数（中学生以上)</th>
+                <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">こども参加人数（年少～小学生）</th>
+                <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">こども参加人数（年少々以下）</th>
+                <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((r) => (
                 <tr key={r.row_hash} className="odd:bg-white even:bg-gray-50">
-                  <td className="px-3 py-2 text-gray-800 whitespace-nowrap">{new Date(r.checked_in_at).toLocaleString()}</td>
-                  <td className="px-3 py-2 text-gray-800 whitespace-nowrap">{r.row_number ?? "-"}</td>
-                  <td className="px-3 py-2 text-gray-800 whitespace-nowrap">{r.name}</td>
                   <td className="px-3 py-2 text-gray-800 whitespace-nowrap">{r.email}</td>
+                  <td className="px-3 py-2 text-gray-800 whitespace-nowrap">{r.name}</td>
+                  <td className="px-3 py-2 text-gray-800 whitespace-nowrap">{r.category}</td>
+                  <td className="px-3 py-2 text-gray-800 whitespace-nowrap">{r.adult}</td>
+                  <td className="px-3 py-2 text-gray-800 whitespace-nowrap">{r.child}</td>
+                  <td className="px-3 py-2 text-gray-800 whitespace-nowrap">{r.infant}</td>
+                  <td className="px-3 py-2 text-gray-800 whitespace-nowrap">
+                    <button
+                      onClick={() => handleRemove(r.row_hash)}
+                      className="rounded px-3 py-1 text-sm border text-red-700 border-red-300 bg-red-50 hover:bg-red-100"
+                    >
+                      Remove
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
