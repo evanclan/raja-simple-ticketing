@@ -18,7 +18,10 @@ function CheckinsView() {
   >([]);
 
   const EMAIL_REGEX = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
-  function detectEmail(headers: string[] | null | undefined, data: Record<string, any>): string {
+  function detectEmail(
+    headers: string[] | null | undefined,
+    data: Record<string, any>
+  ): string {
     const candidates = (headers || []).map((h) => String(h || ""));
     const lower = candidates.map((h) => h.toLowerCase());
     const patterns = ["email", "e-mail", "mail", "メール", "メールアドレス"];
@@ -35,9 +38,20 @@ function CheckinsView() {
     }
     return "";
   }
-  function detectName(headers: string[] | null | undefined, data: Record<string, any>): string {
+  function detectName(
+    headers: string[] | null | undefined,
+    data: Record<string, any>
+  ): string {
     const candidates = (headers || []).map((h) => String(h || ""));
-    const patterns = ["代表者氏名", "代表者", "氏名", "お名前", "名前", "name", "申込者"];
+    const patterns = [
+      "代表者氏名",
+      "代表者",
+      "氏名",
+      "お名前",
+      "名前",
+      "name",
+      "申込者",
+    ];
     for (const key of candidates) {
       const k = String(key || "").toLowerCase();
       if (patterns.some((p) => k.includes(p.toLowerCase()))) {
@@ -47,9 +61,20 @@ function CheckinsView() {
     }
     return "";
   }
-  function detectCategory(headers: string[] | null | undefined, data: Record<string, any>): string {
+  function detectCategory(
+    headers: string[] | null | undefined,
+    data: Record<string, any>
+  ): string {
     const candidates = (headers || []).map((h) => String(h || ""));
-    const patterns = ["参加区分", "区分", "参加", "カテゴリ", "カテゴリー", "category", "type"];
+    const patterns = [
+      "参加区分",
+      "区分",
+      "参加",
+      "カテゴリ",
+      "カテゴリー",
+      "category",
+      "type",
+    ];
     for (const key of candidates) {
       const k = String(key || "").toLowerCase();
       if (patterns.some((p) => k.includes(p.toLowerCase()))) {
@@ -64,9 +89,14 @@ function CheckinsView() {
     for (const header of list) {
       const h = header.toLowerCase();
       if (
-        ["おとな", "大人", "成人", "中学生以上", "おとな参加人数", "adult"].some((p) =>
-          h.includes(p)
-        )
+        [
+          "おとな",
+          "大人",
+          "成人",
+          "中学生以上",
+          "おとな参加人数",
+          "adult",
+        ].some((p) => h.includes(p))
       )
         return header;
     }
@@ -77,15 +107,23 @@ function CheckinsView() {
     for (const header of list) {
       const h = header.toLowerCase();
       if (
-        ["こども", "子ども", "子供", "小学生", "年少", "こども参加人数", "child"].some((p) =>
-          h.includes(p)
-        )
+        [
+          "こども",
+          "子ども",
+          "子供",
+          "小学生",
+          "年少",
+          "こども参加人数",
+          "child",
+        ].some((p) => h.includes(p))
       )
         return header;
     }
     return null;
   }
-  function detectInfantKey(headers: string[] | null | undefined): string | null {
+  function detectInfantKey(
+    headers: string[] | null | undefined
+  ): string | null {
     const list = (headers || []).map((h) => String(h || ""));
     for (const header of list) {
       const h = header.toLowerCase();
@@ -100,7 +138,9 @@ function CheckinsView() {
   }
   function normalizeDigits(input: string): string {
     if (!input) return "";
-    return input.replace(/[\uFF10-\uFF19]/g, (d) => String(d.charCodeAt(0) - 0xff10));
+    return input.replace(/[\uFF10-\uFF19]/g, (d) =>
+      String(d.charCodeAt(0) - 0xff10)
+    );
   }
   function parseCount(value: unknown): number {
     if (value == null) return 0;
@@ -134,7 +174,10 @@ function CheckinsView() {
           .select("row_hash, checked_in_at")
           .order("checked_in_at", { ascending: false });
         if (cErr) throw cErr;
-        const list = (checkins || []) as Array<{ row_hash: string; checked_in_at: string }>;
+        const list = (checkins || []) as Array<{
+          row_hash: string;
+          checked_in_at: string;
+        }>;
         if (list.length === 0) {
           setRows([]);
           return;
@@ -145,16 +188,16 @@ function CheckinsView() {
           .select("row_hash, row_number, headers, data")
           .in("row_hash", hashes);
         if (pErr) throw pErr;
-        const map = new Map<string, { row_number: number; headers: string[]; data: Record<string, any> }>();
+        const map = new Map<
+          string,
+          { row_number: number; headers: string[]; data: Record<string, any> }
+        >();
         for (const r of participants || []) {
-          map.set(
-            (r as any).row_hash as string,
-            {
-              row_number: (r as any).row_number as number,
-              headers: ((r as any).headers as string[]) || [],
-              data: ((r as any).data as Record<string, any>) || {},
-            }
-          );
+          map.set((r as any).row_hash as string, {
+            row_number: (r as any).row_number as number,
+            headers: ((r as any).headers as string[]) || [],
+            data: ((r as any).data as Record<string, any>) || {},
+          });
         }
         const merged = list.map((c) => {
           const p = map.get(c.row_hash);
@@ -169,7 +212,15 @@ function CheckinsView() {
           const adult = parseCount(adultKey ? data[adultKey] : undefined);
           const child = parseCount(childKey ? data[childKey] : undefined);
           const infant = parseCount(infantKey ? data[infantKey] : undefined);
-          return { row_hash: c.row_hash, email, name, category, adult, child, infant };
+          return {
+            row_hash: c.row_hash,
+            email,
+            name,
+            category,
+            adult,
+            child,
+            infant,
+          };
         });
         setRows(merged);
       } catch (e: any) {
@@ -189,7 +240,9 @@ function CheckinsView() {
       {loading ? (
         <div className="text-gray-600">Loading…</div>
       ) : error ? (
-        <div className="rounded border border-red-300 bg-red-50 p-3 text-red-800">{error}</div>
+        <div className="rounded border border-red-300 bg-red-50 p-3 text-red-800">
+          {error}
+        </div>
       ) : rows.length === 0 ? (
         <div className="text-gray-600">No check-ins yet.</div>
       ) : (
@@ -197,24 +250,50 @@ function CheckinsView() {
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">メールアドレス</th>
-                <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">代表者氏名</th>
-                <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">参加区分</th>
-                <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">おとな参加人数（中学生以上)</th>
-                <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">こども参加人数（年少～小学生）</th>
-                <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">こども参加人数（年少々以下）</th>
-                <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">Actions</th>
+                <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">
+                  メールアドレス
+                </th>
+                <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">
+                  代表者氏名
+                </th>
+                <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">
+                  参加区分
+                </th>
+                <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">
+                  おとな参加人数（中学生以上)
+                </th>
+                <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">
+                  こども参加人数（年少～小学生）
+                </th>
+                <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">
+                  こども参加人数（年少々以下）
+                </th>
+                <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody>
               {rows.map((r) => (
                 <tr key={r.row_hash} className="odd:bg-white even:bg-gray-50">
-                  <td className="px-3 py-2 text-gray-800 whitespace-nowrap">{r.email}</td>
-                  <td className="px-3 py-2 text-gray-800 whitespace-nowrap">{r.name}</td>
-                  <td className="px-3 py-2 text-gray-800 whitespace-nowrap">{r.category}</td>
-                  <td className="px-3 py-2 text-gray-800 whitespace-nowrap">{r.adult}</td>
-                  <td className="px-3 py-2 text-gray-800 whitespace-nowrap">{r.child}</td>
-                  <td className="px-3 py-2 text-gray-800 whitespace-nowrap">{r.infant}</td>
+                  <td className="px-3 py-2 text-gray-800 whitespace-nowrap">
+                    {r.email}
+                  </td>
+                  <td className="px-3 py-2 text-gray-800 whitespace-nowrap">
+                    {r.name}
+                  </td>
+                  <td className="px-3 py-2 text-gray-800 whitespace-nowrap">
+                    {r.category}
+                  </td>
+                  <td className="px-3 py-2 text-gray-800 whitespace-nowrap">
+                    {r.adult}
+                  </td>
+                  <td className="px-3 py-2 text-gray-800 whitespace-nowrap">
+                    {r.child}
+                  </td>
+                  <td className="px-3 py-2 text-gray-800 whitespace-nowrap">
+                    {r.infant}
+                  </td>
                   <td className="px-3 py-2 text-gray-800 whitespace-nowrap">
                     <button
                       onClick={() => handleRemove(r.row_hash)}
@@ -252,7 +331,10 @@ function EntryPassView({ token }: { token: string }) {
 
   // Field detectors
   const EMAIL_REGEX = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
-  function detectEmail(headers: string[] | null | undefined, data: Record<string, any>): string {
+  function detectEmail(
+    headers: string[] | null | undefined,
+    data: Record<string, any>
+  ): string {
     const candidates = (headers || []).map((h) => String(h || ""));
     const lower = candidates.map((h) => h.toLowerCase());
     const patterns = ["email", "e-mail", "mail", "メール", "メールアドレス"];
@@ -269,9 +351,20 @@ function EntryPassView({ token }: { token: string }) {
     }
     return "";
   }
-  function detectName(headers: string[] | null | undefined, data: Record<string, any>): string {
+  function detectName(
+    headers: string[] | null | undefined,
+    data: Record<string, any>
+  ): string {
     const candidates = (headers || []).map((h) => String(h || ""));
-    const patterns = ["代表者氏名", "代表者", "氏名", "お名前", "名前", "name", "申込者"];
+    const patterns = [
+      "代表者氏名",
+      "代表者",
+      "氏名",
+      "お名前",
+      "名前",
+      "name",
+      "申込者",
+    ];
     for (const key of candidates) {
       const k = String(key || "").toLowerCase();
       if (patterns.some((p) => k.includes(p.toLowerCase()))) {
@@ -281,9 +374,20 @@ function EntryPassView({ token }: { token: string }) {
     }
     return "";
   }
-  function detectCategory(headers: string[] | null | undefined, data: Record<string, any>): string {
+  function detectCategory(
+    headers: string[] | null | undefined,
+    data: Record<string, any>
+  ): string {
     const candidates = (headers || []).map((h) => String(h || ""));
-    const patterns = ["参加区分", "区分", "参加", "カテゴリ", "カテゴリー", "category", "type"];
+    const patterns = [
+      "参加区分",
+      "区分",
+      "参加",
+      "カテゴリ",
+      "カテゴリー",
+      "category",
+      "type",
+    ];
     for (const key of candidates) {
       const k = String(key || "").toLowerCase();
       if (patterns.some((p) => k.includes(p.toLowerCase()))) {
@@ -298,7 +402,14 @@ function EntryPassView({ token }: { token: string }) {
     for (const header of list) {
       const h = header.toLowerCase();
       if (
-        ["おとな", "大人", "成人", "中学生以上", "おとな参加人数", "adult"].some((p) => h.includes(p))
+        [
+          "おとな",
+          "大人",
+          "成人",
+          "中学生以上",
+          "おとな参加人数",
+          "adult",
+        ].some((p) => h.includes(p))
       )
         return header;
     }
@@ -309,7 +420,28 @@ function EntryPassView({ token }: { token: string }) {
     for (const header of list) {
       const h = header.toLowerCase();
       if (
-        ["こども", "子ども", "子供", "小学生", "年少", "こども参加人数", "child"].some((p) =>
+        [
+          "こども",
+          "子ども",
+          "子供",
+          "小学生",
+          "年少",
+          "こども参加人数",
+          "child",
+        ].some((p) => h.includes(p))
+      )
+        return header;
+    }
+    return null;
+  }
+  function detectInfantKey(
+    headers: string[] | null | undefined
+  ): string | null {
+    const list = (headers || []).map((h) => String(h || ""));
+    for (const header of list) {
+      const h = header.toLowerCase();
+      if (
+        ["年少々以下", "未就学", "幼児", "乳幼児", "未就園"].some((p) =>
           h.includes(p)
         )
       )
@@ -317,18 +449,11 @@ function EntryPassView({ token }: { token: string }) {
     }
     return null;
   }
-  function detectInfantKey(headers: string[] | null | undefined): string | null {
-    const list = (headers || []).map((h) => String(h || ""));
-    for (const header of list) {
-      const h = header.toLowerCase();
-      if (["年少々以下", "未就学", "幼児", "乳幼児", "未就園"].some((p) => h.includes(p)))
-        return header;
-    }
-    return null;
-  }
   function normalizeDigits(input: string): string {
     if (!input) return "";
-    return input.replace(/[\uFF10-\uFF19]/g, (d) => String(d.charCodeAt(0) - 0xff10));
+    return input.replace(/[\uFF10-\uFF19]/g, (d) =>
+      String(d.charCodeAt(0) - 0xff10)
+    );
   }
   function parseCount(value: unknown): number {
     if (value == null) return 0;
@@ -446,47 +571,65 @@ function EntryPassView({ token }: { token: string }) {
               <table className="min-w-full text-sm">
                 <tbody>
                   <tr>
-                    <td className="px-3 py-2 text-gray-600 whitespace-nowrap">メールアドレス</td>
+                    <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
+                      メールアドレス
+                    </td>
                     <td className="px-3 py-2 text-gray-900 whitespace-nowrap">
                       {detectEmail(participant.headers, participant.data)}
                     </td>
                   </tr>
                   <tr>
-                    <td className="px-3 py-2 text-gray-600 whitespace-nowrap">代表者氏名</td>
+                    <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
+                      代表者氏名
+                    </td>
                     <td className="px-3 py-2 text-gray-900 whitespace-nowrap">
                       {detectName(participant.headers, participant.data)}
                     </td>
                   </tr>
                   <tr>
-                    <td className="px-3 py-2 text-gray-600 whitespace-nowrap">参加区分</td>
+                    <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
+                      参加区分
+                    </td>
                     <td className="px-3 py-2 text-gray-900 whitespace-nowrap">
                       {detectCategory(participant.headers, participant.data)}
                     </td>
                   </tr>
                   <tr>
-                    <td className="px-3 py-2 text-gray-600 whitespace-nowrap">おとな参加人数（中学生以上)</td>
+                    <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
+                      おとな参加人数（中学生以上)
+                    </td>
                     <td className="px-3 py-2 text-gray-900 whitespace-nowrap">
                       {(() => {
                         const key = detectAdultKey(participant.headers);
-                        return parseCount(key ? participant.data[key] : undefined);
+                        return parseCount(
+                          key ? participant.data[key] : undefined
+                        );
                       })()}
                     </td>
                   </tr>
                   <tr>
-                    <td className="px-3 py-2 text-gray-600 whitespace-nowrap">こども参加人数（年少～小学生）</td>
+                    <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
+                      こども参加人数（年少～小学生）
+                    </td>
                     <td className="px-3 py-2 text-gray-900 whitespace-nowrap">
                       {(() => {
                         const key = detectChildKey(participant.headers);
-                        return parseCount(key ? participant.data[key] : undefined);
+                        return parseCount(
+                          key ? participant.data[key] : undefined
+                        );
                       })()}
                     </td>
                   </tr>
                   <tr>
-                    <td className="px-3 py-2 text-gray-600 whitespace-nowrap">こども参加人数（年少々以下）</td>
+                    <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
+                      こども参加人数（年少々以下）
+                    </td>
                     <td className="px-3 py-2 text-gray-900 whitespace-nowrap">
                       {(() => {
                         const key = detectInfantKey(participant.headers);
-                        return parseCount(key ? participant.data[key] : undefined);
+                        return parseCount(
+                          key ? participant.data[key] : undefined
+                        );
                       })()}
                     </td>
                   </tr>
@@ -555,11 +698,13 @@ export default function App() {
   const [signinPassword, setSigninPassword] = useState<string>("");
   const [authError, setAuthError] = useState<string>("");
 
-  const [sheetId, setSheetId] = useState<string>("");
-  const [range, setRange] = useState<string>("Sheet1!A:Z");
+  const [sheetId, setSheetId] = useState<string>(
+    "1he2VxMHqmTs_gIdu-vtel77h9ISFAZa2GfK629Rd9IU"
+  );
+  const [range] = useState<string>("");
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [resultMessage, setResultMessage] = useState<string>("");
-  const [isLocked, setIsLocked] = useState<boolean>(false);
+
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
 
   // Participants view state
@@ -628,10 +773,10 @@ export default function App() {
   });
   const [isBulkSendingPasses, setIsBulkSendingPasses] =
     useState<boolean>(false);
-  const [entryPassTestRecipient, setEntryPassTestRecipient] =
-    useState<string>("eoalferez@gmail.com");
-  const [isSendingTestPass, setIsSendingTestPass] =
-    useState<boolean>(false);
+  const [entryPassTestRecipient, setEntryPassTestRecipient] = useState<string>(
+    "eoalferez@gmail.com"
+  );
+  const [isSendingTestPass, setIsSendingTestPass] = useState<boolean>(false);
 
   // Calculation module state
   const [calcLoading, setCalcLoading] = useState<boolean>(false);
@@ -693,12 +838,6 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const savedSheetId = localStorage.getItem("sheet_sync_sheet_id");
-    const savedRange = localStorage.getItem("sheet_sync_range");
-    const savedLocked = localStorage.getItem("sheet_sync_locked");
-    if (savedSheetId) setSheetId(savedSheetId);
-    if (savedRange) setRange(savedRange);
-    if (savedLocked) setIsLocked(savedLocked === "1");
     // Load sent confirmations
     const sent = localStorage.getItem("sent_confirmations");
     if (sent) {
@@ -727,30 +866,20 @@ export default function App() {
     }
   }, []);
 
-  const isDisabled = useMemo(
-    () => !sheetId || !range || isSyncing || isLocked,
-    [sheetId, range, isSyncing, isLocked]
-  );
+  const isDisabled = useMemo(() => isSyncing, [isSyncing]);
 
   async function handleSync() {
-    if (!sheetId) {
-      alert("Enter a Google Sheet ID first");
-      return;
-    }
     if (!userToken) {
       alert("Please sign in first");
       return;
     }
-    if (!confirm("Replace current data with the selected Google Sheet?"))
-      return;
+    if (!confirm("Sync from the Google Sheet now?")) return;
     try {
       setIsSyncing(true);
       setResultMessage("");
       const normalizedId = extractSheetId(sheetId);
       setSheetId(normalizedId);
-      // Persist the chosen sheet and range
-      localStorage.setItem("sheet_sync_sheet_id", normalizedId);
-      localStorage.setItem("sheet_sync_range", range);
+      // Persist (disabled for fixed sheet; keep for compatibility but no-op)
 
       const resp = await fetch(
         `${supabaseUrl}/functions/v1/sync_participants`,
@@ -761,7 +890,7 @@ export default function App() {
             Authorization: `Bearer ${userToken}`,
           },
           body: JSON.stringify({
-            action: "replace",
+            action: "sync",
             sheetId: normalizedId,
             range,
           }),
@@ -1593,18 +1722,20 @@ export default function App() {
           <div className="rounded-lg border bg-white p-6 shadow-sm">
             {!isCheckinsRoute && (
               <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold">
-                Sync participants from Google Sheets
-              </h2>
-              <div className="flex items-center gap-3 text-sm">
-                <span className="text-gray-600">Signed in as {userEmail}</span>
-                <button
-                  onClick={handleSignOut}
-                  className="rounded border px-3 py-1 text-gray-700 hover:bg-gray-50"
-                >
-                  Sign out
-                </button>
-              </div>
+                <h2 className="text-lg font-semibold">
+                  Sync participants from Google Sheets
+                </h2>
+                <div className="flex items-center gap-3 text-sm">
+                  <span className="text-gray-600">
+                    Signed in as {userEmail}
+                  </span>
+                  <button
+                    onClick={handleSignOut}
+                    className="rounded border px-3 py-1 text-gray-700 hover:bg-gray-50"
+                  >
+                    Sign out
+                  </button>
+                </div>
               </div>
             )}
             {isCheckinsRoute ? (
@@ -1749,107 +1880,13 @@ export default function App() {
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <label className="block">
-                    <span className="text-sm text-gray-700">
-                      Google Sheet ID
-                    </span>
-                    <input
-                      className="mt-1 w-full rounded border px-3 py-2"
-                      placeholder="e.g. 1AbCDefGhIjK..."
-                      value={sheetId}
-                      onChange={(e) => setSheetId(e.target.value)}
-                      disabled={isLocked}
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="text-sm text-gray-700">
-                      Range (e.g. Sheet1!A:Z)
-                    </span>
-                    <input
-                      className="mt-1 w-full rounded border px-3 py-2"
-                      placeholder="Sheet1!A:Z"
-                      value={range}
-                      onChange={(e) => setRange(e.target.value)}
-                      disabled={isLocked}
-                    />
-                  </label>
-                </div>
                 <div className="mt-4 flex items-center gap-3">
-                  <button
-                    onClick={() => {
-                      const next = !isLocked;
-                      setIsLocked(next);
-                      localStorage.setItem(
-                        "sheet_sync_locked",
-                        next ? "1" : "0"
-                      );
-                    }}
-                    className={`rounded border px-4 py-2 text-sm ${
-                      isLocked
-                        ? "border-gray-300 bg-gray-100 text-gray-700"
-                        : "border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100"
-                    }`}
-                  >
-                    {isLocked ? "Unlock Google Sheet" : "Lock Google Sheet"}
-                  </button>
                   <button
                     onClick={handleSync}
                     disabled={isDisabled}
                     className={`rounded bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 disabled:opacity-50`}
                   >
                     {isSyncing ? "Syncing…" : "Sync now"}
-                  </button>
-                  <button
-                    onClick={async () => {
-                      if (
-                        !confirm(
-                          "Reset latest imported rows and paid participants to zero?"
-                        )
-                      )
-                        return;
-                      if (!userToken) {
-                        alert("Please sign in first");
-                        return;
-                      }
-                      setIsSyncing(true);
-                      setResultMessage("");
-                      try {
-                        const resp = await fetch(
-                          `${supabaseUrl}/functions/v1/sync_participants`,
-                          {
-                            method: "POST",
-                            headers: {
-                              "Content-Type": "application/json",
-                              Authorization: `Bearer ${userToken}`,
-                            },
-                            // Some older deployments require sheetId even for clear actions
-                            body: JSON.stringify({
-                              action: "clear_all",
-                              sheetId: sheetId || "RESET",
-                            }),
-                          }
-                        );
-                        if (!resp.ok) {
-                          const txt = await resp.text();
-                          throw new Error(`HTTP ${resp.status}: ${txt}`);
-                        }
-                        setResultMessage(
-                          "OK: cleared participants and paid list"
-                        );
-                        await loadParticipants(1);
-                        await loadPaidParticipants();
-                        await calculateTotalsAcrossAllRows();
-                      } catch (e: any) {
-                        setResultMessage(`Error: ${e?.message ?? String(e)}`);
-                      } finally {
-                        setIsSyncing(false);
-                      }
-                    }}
-                    disabled={isLocked || isSyncing}
-                    className="rounded border border-red-300 bg-red-50 px-4 py-2 text-red-800 hover:bg-red-100 disabled:opacity-50"
-                  >
-                    Reset latest rows + paid list
                   </button>
                   {resultMessage && (
                     <span className="text-sm text-gray-700" role="status">
@@ -1976,7 +2013,9 @@ export default function App() {
                           <input
                             type="email"
                             value={entryPassTestRecipient}
-                            onChange={(e) => setEntryPassTestRecipient(e.target.value)}
+                            onChange={(e) =>
+                              setEntryPassTestRecipient(e.target.value)
+                            }
                             placeholder="test@example.com"
                             className="rounded border px-2 py-1 text-sm"
                           />
@@ -1985,7 +2024,9 @@ export default function App() {
                             disabled={isSendingTestPass}
                             className="rounded border px-3 py-1 text-sm text-fuchsia-700 border-fuchsia-300 bg-fuchsia-50 hover:bg-fuchsia-100 disabled:opacity-50"
                           >
-                            {isSendingTestPass ? "Sending…" : "Send test entry pass"}
+                            {isSendingTestPass
+                              ? "Sending…"
+                              : "Send test entry pass"}
                           </button>
                         </div>
                         <button
