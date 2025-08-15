@@ -251,6 +251,95 @@ function EntryPassView({ token }: { token: string }) {
   const [pin, setPin] = useState<string>("");
   const [submitting, setSubmitting] = useState<boolean>(false);
 
+  // Field detectors
+  const EMAIL_REGEX = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
+  function detectEmail(headers: string[] | null | undefined, data: Record<string, any>): string {
+    const candidates = (headers || []).map((h) => String(h || ""));
+    const lower = candidates.map((h) => h.toLowerCase());
+    const patterns = ["email", "e-mail", "mail", "メール", "メールアドレス"];
+    for (let i = 0; i < candidates.length; i++) {
+      const h = lower[i];
+      if (patterns.some((p) => h.includes(p))) {
+        const key = candidates[i];
+        const val = data?.[key];
+        if (typeof val === "string" && EMAIL_REGEX.test(val)) return val.trim();
+      }
+    }
+    for (const v of Object.values(data || {})) {
+      if (typeof v === "string" && EMAIL_REGEX.test(v)) return v.trim();
+    }
+    return "";
+  }
+  function detectName(headers: string[] | null | undefined, data: Record<string, any>): string {
+    const candidates = (headers || []).map((h) => String(h || ""));
+    const patterns = ["代表者氏名", "代表者", "氏名", "お名前", "名前", "name", "申込者"];
+    for (const key of candidates) {
+      const k = String(key || "").toLowerCase();
+      if (patterns.some((p) => k.includes(p.toLowerCase()))) {
+        const v = data?.[key];
+        if (v) return String(v);
+      }
+    }
+    return "";
+  }
+  function detectCategory(headers: string[] | null | undefined, data: Record<string, any>): string {
+    const candidates = (headers || []).map((h) => String(h || ""));
+    const patterns = ["参加区分", "区分", "参加", "カテゴリ", "カテゴリー", "category", "type"];
+    for (const key of candidates) {
+      const k = String(key || "").toLowerCase();
+      if (patterns.some((p) => k.includes(p.toLowerCase()))) {
+        const v = data?.[key];
+        if (v != null) return String(v);
+      }
+    }
+    return "";
+  }
+  function detectAdultKey(headers: string[] | null | undefined): string | null {
+    const list = (headers || []).map((h) => String(h || ""));
+    for (const header of list) {
+      const h = header.toLowerCase();
+      if (
+        ["おとな", "大人", "成人", "中学生以上", "おとな参加人数", "adult"].some((p) => h.includes(p))
+      )
+        return header;
+    }
+    return null;
+  }
+  function detectChildKey(headers: string[] | null | undefined): string | null {
+    const list = (headers || []).map((h) => String(h || ""));
+    for (const header of list) {
+      const h = header.toLowerCase();
+      if (
+        ["こども", "子ども", "子供", "小学生", "年少", "こども参加人数", "child"].some((p) =>
+          h.includes(p)
+        )
+      )
+        return header;
+    }
+    return null;
+  }
+  function detectInfantKey(headers: string[] | null | undefined): string | null {
+    const list = (headers || []).map((h) => String(h || ""));
+    for (const header of list) {
+      const h = header.toLowerCase();
+      if (["年少々以下", "未就学", "幼児", "乳幼児", "未就園"].some((p) => h.includes(p)))
+        return header;
+    }
+    return null;
+  }
+  function normalizeDigits(input: string): string {
+    if (!input) return "";
+    return input.replace(/[\uFF10-\uFF19]/g, (d) => String(d.charCodeAt(0) - 0xff10));
+  }
+  function parseCount(value: unknown): number {
+    if (value == null) return 0;
+    const text = normalizeDigits(String(value));
+    const match = text.match(/(\d+)/);
+    if (!match) return 0;
+    const n = parseInt(match[1], 10);
+    return Number.isFinite(n) ? n : 0;
+  }
+
   useEffect(() => {
     (async () => {
       try {
@@ -364,25 +453,56 @@ function EntryPassView({ token }: { token: string }) {
               <table className="min-w-full text-sm">
                 <tbody>
                   <tr>
-                    <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
-                      #
-                    </td>
+                    <td className="px-3 py-2 text-gray-600 whitespace-nowrap">メールアドレス</td>
                     <td className="px-3 py-2 text-gray-900 whitespace-nowrap">
-                      {participant.row_number}
+                      {detectEmail(participant.headers, participant.data)}
                     </td>
                   </tr>
-                  {participant.headers.map((h, idx) => (
-                    <tr key={`p-${idx}`}>
-                      <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
-                        {h || "(empty)"}
-                      </td>
-                      <td className="px-3 py-2 text-gray-900 whitespace-nowrap">
-                        {String(
-                          participant.data?.[h || `col_${idx + 1}`] ?? ""
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                  <tr>
+                    <td className="px-3 py-2 text-gray-600 whitespace-nowrap">代表者氏名</td>
+                    <td className="px-3 py-2 text-gray-900 whitespace-nowrap">
+                      {detectName(participant.headers, participant.data)}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="px-3 py-2 text-gray-600 whitespace-nowrap">参加区分</td>
+                    <td className="px-3 py-2 text-gray-900 whitespace-nowrap">
+                      {detectCategory(participant.headers, participant.data)}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="px-3 py-2 text-gray-600 whitespace-nowrap">おとな参加人数（中学生以上)</td>
+                    <td className="px-3 py-2 text-gray-900 whitespace-nowrap">
+                      {(() => {
+                        const key = detectAdultKey(participant.headers);
+                        return parseCount(key ? participant.data[key] : undefined);
+                      })()}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="px-3 py-2 text-gray-600 whitespace-nowrap">こども参加人数（年少～小学生）</td>
+                    <td className="px-3 py-2 text-gray-900 whitespace-nowrap">
+                      {(() => {
+                        const key = detectChildKey(participant.headers);
+                        return parseCount(key ? participant.data[key] : undefined);
+                      })()}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="px-3 py-2 text-gray-600 whitespace-nowrap">こども参加人数（年少々以下）</td>
+                    <td className="px-3 py-2 text-gray-900 whitespace-nowrap">
+                      {(() => {
+                        const key = detectInfantKey(participant.headers);
+                        return parseCount(key ? participant.data[key] : undefined);
+                      })()}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="px-3 py-2 text-gray-600 whitespace-nowrap">data</td>
+                    <td className="px-3 py-2 text-gray-900 whitespace-pre-wrap break-all">
+                      {JSON.stringify(participant.data)}
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>
