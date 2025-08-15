@@ -1708,7 +1708,7 @@ export default function App() {
     <div className="min-h-screen bg-gray-50 text-gray-900">
       <header className="border-b bg-white">
         <div className="mx-auto max-w-5xl px-4 py-4 flex items-center justify-between">
-          <div>
+          <div className="flex items-center gap-3">
             <h1 className="text-xl font-semibold">RaJA Ticketing System</h1>
             <p className="text-sm text-gray-900 opacity-60">
               Created and licensed by RaJA IT department
@@ -1743,7 +1743,10 @@ export default function App() {
                 <span className="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
                 <span className="text-sm text-gray-800">Supabase</span>
               </li>
-              <li className="flex items-center gap-2" title={resendError || undefined}>
+              <li
+                className="flex items-center gap-2"
+                title={resendError || undefined}
+              >
                 <span
                   className={`inline-flex h-2.5 w-2.5 rounded-full ${
                     resendOk === null
@@ -2058,29 +2061,9 @@ export default function App() {
                         >
                           Refresh
                         </button>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="email"
-                            value={entryPassTestRecipient}
-                            onChange={(e) =>
-                              setEntryPassTestRecipient(e.target.value)
-                            }
-                            placeholder="test@example.com"
-                            className="rounded border px-2 py-1 text-sm"
-                          />
-                          <button
-                            onClick={handleSendTestEntryPass}
-                            disabled={isSendingTestPass}
-                            className="rounded border px-3 py-1 text-sm text-fuchsia-700 border-fuchsia-300 bg-fuchsia-50 hover:bg-fuchsia-100 disabled:opacity-50"
-                          >
-                            {isSendingTestPass
-                              ? "Sending…"
-                              : "Send test entry pass"}
-                          </button>
-                        </div>
                         <button
                           onClick={handleBulkSendPasses}
-                          disabled={isBulkSendingPasses}
+                          disabled={true}
                           className="rounded border px-3 py-1 text-sm text-purple-700 border-purple-300 bg-purple-50 hover:bg-purple-100 disabled:opacity-50"
                         >
                           {isBulkSendingPasses
@@ -2378,16 +2361,16 @@ export default function App() {
                               const d = r.data || {};
                               const a = parseCount(
                                 resolvedAdultKey
-                                  ? d[resolvedAdultKey]
+                                  ? d[resolvedAdultKey as string]
                                   : undefined
                               );
                               const c = parseCount(
                                 resolvedChildKey
-                                  ? d[resolvedChildKey]
+                                  ? d[resolvedChildKey as string]
                                   : undefined
                               );
                               const cat = resolvedCategoryKey
-                                ? d[resolvedCategoryKey]
+                                ? d[resolvedCategoryKey as string]
                                 : undefined;
                               sum += computeRowPrice(a, c, isRajaFamily(cat));
                             }
@@ -2486,6 +2469,32 @@ export default function App() {
                         </div>
                       </div>
                     )}
+                    {/* Moved: Entry pass test sender (to bottom to avoid confusion with bulk send) */}
+                    <div className="mt-10">
+                      <div className="mb-2">
+                        <h3 className="font-medium">Entry pass (test send)</h3>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="email"
+                          value={entryPassTestRecipient}
+                          onChange={(e) =>
+                            setEntryPassTestRecipient(e.target.value)
+                          }
+                          placeholder="test@example.com"
+                          className="rounded border px-2 py-1 text-sm"
+                        />
+                        <button
+                          onClick={handleSendTestEntryPass}
+                          disabled={isSendingTestPass}
+                          className="rounded border px-3 py-1 text-sm text-fuchsia-700 border-fuchsia-300 bg-fuchsia-50 hover:bg-fuchsia-100 disabled:opacity-50"
+                        >
+                          {isSendingTestPass
+                            ? "Sending…"
+                            : "Send test entry pass"}
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </>
