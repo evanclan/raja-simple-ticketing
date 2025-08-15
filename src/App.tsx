@@ -235,7 +235,6 @@ function CheckinsView() {
 
 function EntryPassView({ token }: { token: string }) {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-  const supabaseAnon = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
   const [participant, setParticipant] = useState<{
@@ -349,8 +348,6 @@ function EntryPassView({ token }: { token: string }) {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            apikey: supabaseAnon,
-            Authorization: `Bearer ${supabaseAnon}`,
           },
           body: JSON.stringify({ action: "resolve", token }),
         });
@@ -376,7 +373,7 @@ function EntryPassView({ token }: { token: string }) {
         setLoading(false);
       }
     })();
-  }, [supabaseUrl, supabaseAnon, token]);
+  }, [supabaseUrl, token]);
 
   async function handleApprove() {
     try {
@@ -386,8 +383,6 @@ function EntryPassView({ token }: { token: string }) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          apikey: supabaseAnon,
-          Authorization: `Bearer ${supabaseAnon}`,
         },
         body: JSON.stringify({ action: "check_in", token, pin }),
       });
@@ -400,8 +395,6 @@ function EntryPassView({ token }: { token: string }) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          apikey: supabaseAnon,
-          Authorization: `Bearer ${supabaseAnon}`,
         },
         body: JSON.stringify({ action: "resolve", token }),
       });
@@ -557,6 +550,7 @@ export default function App() {
   // Auth state
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userToken, setUserToken] = useState<string | null>(null);
   const [signinEmail, setSigninEmail] = useState<string>("");
   const [signinPassword, setSigninPassword] = useState<string>("");
   const [authError, setAuthError] = useState<string>("");
@@ -567,7 +561,6 @@ export default function App() {
   const [resultMessage, setResultMessage] = useState<string>("");
   const [isLocked, setIsLocked] = useState<boolean>(false);
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-  const supabaseAnon = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
   // Participants view state
   const [tableHeaders, setTableHeaders] = useState<string[]>([]);
@@ -683,12 +676,14 @@ export default function App() {
       const { data } = await supabase.auth.getSession();
       const email = data.session?.user?.email ?? null;
       setUserEmail(email);
+      setUserToken(data.session?.access_token ?? null);
       setIsAuthLoading(false);
     })();
 
     const { data: sub } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         setUserEmail(session?.user?.email ?? null);
+        setUserToken(session?.access_token ?? null);
       }
     );
 
@@ -742,6 +737,10 @@ export default function App() {
       alert("Enter a Google Sheet ID first");
       return;
     }
+    if (!userToken) {
+      alert("Please sign in first");
+      return;
+    }
     if (!confirm("Replace current data with the selected Google Sheet?"))
       return;
     try {
@@ -759,7 +758,7 @@ export default function App() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            apikey: supabaseAnon,
+            Authorization: `Bearer ${userToken}`,
           },
           body: JSON.stringify({
             action: "replace",
@@ -981,6 +980,10 @@ export default function App() {
 
   async function handleSendTestEmail() {
     try {
+      if (!userToken) {
+        alert("Please sign in first");
+        return;
+      }
       const to = (testRecipient || "").trim();
       if (!to) {
         alert("Enter a test recipient email");
@@ -1008,8 +1011,7 @@ export default function App() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            apikey: supabaseAnon,
-            Authorization: `Bearer ${supabaseAnon}`,
+            Authorization: `Bearer ${userToken}`,
           },
           body: JSON.stringify({
             to,
@@ -1317,6 +1319,10 @@ export default function App() {
     data: Record<string, any>;
   }) {
     try {
+      if (!userToken) {
+        alert("Please sign in first");
+        return;
+      }
       const email = findEmailForRow(row.data);
       if (!email) {
         alert("No email found in this row.");
@@ -1360,8 +1366,7 @@ export default function App() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            apikey: supabaseAnon,
-            Authorization: `Bearer ${supabaseAnon}`,
+            Authorization: `Bearer ${userToken}`,
           },
           body: JSON.stringify({
             to: email,
@@ -1397,14 +1402,17 @@ export default function App() {
     data: Record<string, any>;
   }) {
     try {
+      if (!userToken) {
+        alert("Please sign in first");
+        return;
+      }
       setSendingPassHash(row.row_hash);
       const baseUrl = window.location.origin;
       const resp = await fetch(`${supabaseUrl}/functions/v1/entry_pass`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          apikey: supabaseAnon,
-          Authorization: `Bearer ${supabaseAnon}`,
+          Authorization: `Bearer ${userToken}`,
         },
         body: JSON.stringify({
           action: "send_email",
@@ -1435,14 +1443,17 @@ export default function App() {
   async function handleBulkSendPasses() {
     if (!confirm("Send entry pass email to all paid participants?")) return;
     try {
+      if (!userToken) {
+        alert("Please sign in first");
+        return;
+      }
       setIsBulkSendingPasses(true);
       const baseUrl = window.location.origin;
       const resp = await fetch(`${supabaseUrl}/functions/v1/entry_pass`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          apikey: supabaseAnon,
-          Authorization: `Bearer ${supabaseAnon}`,
+          Authorization: `Bearer ${userToken}`,
         },
         body: JSON.stringify({
           action: "bulk_send",
@@ -1478,6 +1489,10 @@ export default function App() {
         alert("No paid participants to base the test pass on.");
         return;
       }
+      if (!userToken) {
+        alert("Please sign in first");
+        return;
+      }
       const testTo = (entryPassTestRecipient || "").trim();
       if (!testTo) {
         alert("Enter a test recipient email");
@@ -1490,8 +1505,7 @@ export default function App() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          apikey: supabaseAnon,
-          Authorization: `Bearer ${supabaseAnon}`,
+          Authorization: `Bearer ${userToken}`,
         },
         body: JSON.stringify({
           action: "send_email",
@@ -1608,7 +1622,7 @@ export default function App() {
                 </div>
                 <div className="rounded border p-4 grid gap-3">
                   <div className="text-sm text-gray-700">
-                    Use variables with double curly braces, for example:{" "}
+                    Use variables with double curly braces, for example: {" "}
                     {"{{name}}"}, {"{{email}}"}, {"{{adult}}"}, {"{{child}}"},{" "}
                     {"{{category}}"}, {"{{total}}"}.
                   </div>
@@ -1794,6 +1808,10 @@ export default function App() {
                         )
                       )
                         return;
+                      if (!userToken) {
+                        alert("Please sign in first");
+                        return;
+                      }
                       setIsSyncing(true);
                       setResultMessage("");
                       try {
@@ -1803,7 +1821,7 @@ export default function App() {
                             method: "POST",
                             headers: {
                               "Content-Type": "application/json",
-                              apikey: supabaseAnon,
+                              Authorization: `Bearer ${userToken}`,
                             },
                             // Some older deployments require sheetId even for clear actions
                             body: JSON.stringify({
@@ -2060,9 +2078,7 @@ export default function App() {
                                   ) : (
                                     <div className="flex items-center gap-2">
                                       <button
-                                        onClick={() =>
-                                          handleSendConfirmation(r)
-                                        }
+                                        onClick={() => handleSendConfirmation(r)}
                                         disabled={
                                           sendingConfirmHash === r.row_hash ||
                                           sentConfirmations.has(r.row_hash)

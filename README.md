@@ -100,11 +100,19 @@ Required environment variables (Supabase Edge Function secrets):
 ```bash
 SUPABASE_URL=...
 SUPABASE_SERVICE_ROLE_KEY=... # or SERVICE_ROLE_KEY
+SUPABASE_ANON_KEY=...         # used for verifying user token only
 RESEND_API_KEY=...            # for outbound email
 EMAIL_FROM="RaJA <no-reply@info.raja-international.com>"
-PUBLIC_APP_URL=https://your.app.host # used to build pass links
-ENTRY_JWT_SECRET=long-random-secret # used to sign pass tokens
-ENTRY_ADMIN_PIN=123456              # presented by admin at entrance
+# List of allowed sender identities (comma-separated). If set, any provided `from` must match one of these.
+ALLOWED_FROM="RaJA <no-reply@info.raja-international.com>"
+PUBLIC_APP_URL=https://your.app.host  # used to build pass links and CORS allow origin fallback
+ENTRY_JWT_SECRET=long-random-secret   # used to sign pass tokens
+ENTRY_ADMIN_PIN=123456               # presented by admin at entrance
+# Optional: restrict who can call admin endpoints
+ADMIN_EMAILS="admin@your.org,owner@your.org"  # only these Supabase Auth users can call admin actions
+ADMIN_SECRET=some-strong-random      # optional bypass via x-admin-secret header (server-to-server only)
+# Optional: CORS allowlist (comma-separated). If not set, defaults to PUBLIC_APP_URL origin, else '*'
+CORS_ALLOW_ORIGINS="https://your.app.host,https://staging.your.app.host"
 ```
 
 Database tables used:
@@ -128,11 +136,17 @@ create table if not exists checkins (
 
 Endpoints (Edge Functions):
 
-- `send_payment_confirmation` – send payment confirmation email
+- `send_payment_confirmation` – send payment confirmation email (admin-only)
 - `entry_pass` – actions:
-  - `generate_link` { row_hash, baseUrl? }
-  - `send_email` { row_hash, baseUrl?, from? }
-  - `resolve` { token }
-  - `check_in` { token, pin }
+  - `generate_link` { row_hash, baseUrl? } (admin-only)
+  - `send_email` { row_hash, baseUrl?, from? } (admin-only)
+  - `resolve` { token } (public with valid token)
+  - `check_in` { token, pin } (public PIN; rate limited)
+- `sync_participants` – imports or clears data from Google Sheets (admin-only)
 
-In the UI (admin): under Paid participants, use "Send entry pass" per row or "Send all entry passes".
+### Security notes
+
+- Admin-only actions require a valid Supabase Auth access token in the `Authorization: Bearer <token>` header, matching a user email in `ADMIN_EMAILS`. Alternatively provide `x-admin-secret: ADMIN_SECRET` for server-to-server calls.
+- Do not expose service role keys to the client. Only the Edge Functions use service role keys.
+- Set `CORS_ALLOW_ORIGINS` and `PUBLIC_APP_URL` to restrict cross-origin calls.
+- Ensure RLS policies on `sheet_participants`, `paidparticipants`, and `checkins` allow only authenticated admins as needed.
