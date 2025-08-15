@@ -1275,7 +1275,7 @@ export default function App() {
       // Fetch in chunks until fewer than CHUNK_SIZE rows are returned
       // We only need headers and data for counting
       // Using range() paging
-      // eslint-disable-next-line no-constant-condition
+
       while (true) {
         const { data, error } = await supabase
           .from("sheet_participants")
@@ -1319,7 +1319,7 @@ export default function App() {
       const CHUNK_SIZE = 1000;
       let from = 0;
       const accum: DetailRow[] = [];
-      // eslint-disable-next-line no-constant-condition
+
       while (true) {
         const { data, error } = await supabase
           .from("sheet_participants")
@@ -1688,7 +1688,12 @@ export default function App() {
     <div className="min-h-screen bg-gray-50 text-gray-900">
       <header className="border-b bg-white">
         <div className="mx-auto max-w-5xl px-4 py-4 flex items-center justify-between">
-          <h1 className="text-xl font-semibold">New Simple ticketing</h1>
+          <div>
+            <h1 className="text-xl font-semibold">RaJA Ticketing System</h1>
+            <p className="text-sm text-gray-900 opacity-60">
+              Created and licensed by RaJA IT department
+            </p>
+          </div>
           <nav className="flex items-center gap-2 text-sm">
             <button
               onClick={() => (window.location.href = "/")}
@@ -1708,9 +1713,25 @@ export default function App() {
       <main className="mx-auto max-w-5xl px-4 py-10 space-y-6">
         {!isCheckinsRoute && (
           <div className="rounded-lg border bg-white p-6 shadow-sm">
-            <p className="text-gray-600">
-              Vite + React + Tailwind + Supabase is ready.
-            </p>
+            <div className="mb-3">
+              <h2 className="text-sm font-medium text-gray-700">
+                System status
+              </h2>
+            </div>
+            <ul className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <li className="flex items-center gap-2">
+                <span className="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
+                <span className="text-sm text-gray-800">Supabase</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="inline-flex h-2.5 w-2.5 rounded-full bg-yellow-400 animate-pulse"></span>
+                <span className="text-sm text-gray-800">Resender</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
+                <span className="text-sm text-gray-800">React + Tailwind</span>
+              </li>
+            </ul>
           </div>
         )}
 
@@ -1753,7 +1774,7 @@ export default function App() {
                 </div>
                 <div className="rounded border p-4 grid gap-3">
                   <div className="text-sm text-gray-700">
-                    Use variables with double curly braces, for example: {" "}
+                    Use variables with double curly braces, for example:{" "}
                     {"{{name}}"}, {"{{email}}"}, {"{{adult}}"}, {"{{child}}"},{" "}
                     {"{{category}}"}, {"{{total}}"}.
                   </div>
@@ -2119,7 +2140,9 @@ export default function App() {
                                   ) : (
                                     <div className="flex items-center gap-2">
                                       <button
-                                        onClick={() => handleSendConfirmation(r)}
+                                        onClick={() =>
+                                          handleSendConfirmation(r)
+                                        }
                                         disabled={
                                           sendingConfirmHash === r.row_hash ||
                                           sentConfirmations.has(r.row_hash)
