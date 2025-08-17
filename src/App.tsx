@@ -246,7 +246,7 @@ function CheckinsView() {
       ) : rows.length === 0 ? (
         <div className="text-gray-600">No check-ins yet.</div>
       ) : (
-        <div className="overflow-auto border rounded">
+        <div className="table-scroll overflow-auto border rounded">
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50">
               <tr>
@@ -541,7 +541,7 @@ function EntryPassView({ token }: { token: string }) {
     <div className="min-h-screen bg-gray-50 text-gray-900">
       <header className="border-b bg-white">
         <div className="mx-auto max-w-2xl px-4 py-4">
-          <h1 className="text-xl font-semibold">Entry Pass</h1>
+          <h1 className="text-base sm:text-xl font-semibold">Entry Pass</h1>
         </div>
       </header>
       <main className="mx-auto max-w-2xl px-4 py-8 space-y-6">
@@ -567,7 +567,7 @@ function EntryPassView({ token }: { token: string }) {
                 </span>
               )}
             </div>
-            <div className="overflow-auto border rounded">
+            <div className="table-scroll overflow-auto border rounded">
               <table className="min-w-full text-sm">
                 <tbody>
                   <tr>
@@ -1707,14 +1707,16 @@ export default function App() {
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
       <header className="border-b bg-white">
-        <div className="mx-auto max-w-5xl px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl font-semibold">RaJA Ticketing System</h1>
-            <p className="text-sm text-gray-900 opacity-60">
+        <div className="mx-auto max-w-5xl px-4 py-4 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <h1 className="text-base sm:text-xl font-semibold">
+              RaJA Ticketing System
+            </h1>
+            <p className="text-xs sm:text-sm text-gray-900 opacity-60">
               Created and licensed by RaJA IT department
             </p>
           </div>
-          <nav className="flex items-center gap-2 text-sm">
+          <nav className="flex w-full sm:w-auto items-center gap-2 text-sm justify-start sm:justify-end">
             <button
               onClick={() => (window.location.href = "/")}
               className="rounded border px-3 py-1 text-gray-700 hover:bg-gray-50"
@@ -1980,7 +1982,7 @@ export default function App() {
                       </button>
                     </div>
                   </div>
-                  <div className="overflow-auto border rounded">
+                  <div className="table-scroll overflow-auto border rounded">
                     <table className="min-w-full text-sm">
                       <thead className="bg-gray-50">
                         <tr>
@@ -2072,7 +2074,7 @@ export default function App() {
                         </button>
                       </div>
                     </div>
-                    <div className="overflow-auto border rounded">
+                    <div className="table-scroll overflow-auto border rounded">
                       <table className="min-w-full text-sm">
                         <thead className="bg-gray-50">
                           <tr>
@@ -2411,7 +2413,7 @@ export default function App() {
                                 No rows with attendees.
                               </div>
                             ) : (
-                              <div className="overflow-auto border rounded">
+                              <div className="table-scroll overflow-auto border rounded">
                                 <table className="min-w-full text-sm">
                                   <thead className="bg-gray-50">
                                     <tr>

@@ -1,1 +1,27 @@
 @import "tailwindcss";
+
+/* Safe area for iOS notch */
+:root {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+/* Improve tap targets on mobile */
+button,
+input,
+select,
+textarea {
+  font-size: 16px; /* avoid iOS zoom */
+}
+
+/* Tables: enable horizontal scroll on narrow screens */
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
