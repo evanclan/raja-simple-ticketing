@@ -540,7 +540,7 @@ function EntryPassView({ token }: { token: string }) {
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
       <header className="border-b bg-white">
-        <div className="mx-auto max-w-2xl px-4 py-4">
+        <div className="mx-auto max-w-2xl px-4 pt-6 pb-4">
           <h1 className="text-base sm:text-xl font-semibold">Entry Pass</h1>
         </div>
       </header>
@@ -1707,7 +1707,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
       <header className="border-b bg-white">
-        <div className="mx-auto max-w-5xl px-4 py-4 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
+        <div className="mx-auto max-w-5xl px-4 pt-6 pb-4 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
           <div className="flex items-center gap-2 sm:gap-3">
             <h1 className="text-base sm:text-xl font-semibold">
               RaJA Ticketing System
@@ -1716,41 +1716,38 @@ export default function App() {
               Created and licensed by RaJA IT department
             </p>
           </div>
-          <nav className="flex w-full sm:w-auto items-center gap-2 text-sm justify-start sm:justify-end">
-            <button
-              onClick={() => (window.location.href = "/")}
-              className="rounded border px-3 py-1 text-gray-700 hover:bg-gray-50"
-            >
-              Dashboard
-            </button>
-            <button
-              onClick={() => (window.location.href = "/checkins")}
-              className="rounded border px-3 py-1 text-gray-700 hover:bg-gray-50"
-            >
-              Checked-in
-            </button>
-          </nav>
+          {userEmail && (
+            <nav className="flex w-full sm:w-auto items-center gap-2 text-sm justify-start sm:justify-end">
+              <button
+                onClick={() => (window.location.href = "/")}
+                className="rounded border px-3 py-1 text-gray-700 hover:bg-gray-50"
+              >
+                Dashboard
+              </button>
+              <button
+                onClick={() => (window.location.href = "/checkins")}
+                className="rounded border px-3 py-1 text-gray-700 hover:bg-gray-50"
+              >
+                Checked-in
+              </button>
+            </nav>
+          )}
         </div>
       </header>
       <main className="mx-auto max-w-5xl px-4 py-10 space-y-6">
-        {!isCheckinsRoute && (
-          <div className="rounded-lg border bg-white p-6 shadow-sm">
-            <div className="mb-3">
-              <h2 className="text-sm font-medium text-gray-700">
-                System status
-              </h2>
+        {!isCheckinsRoute && userEmail && (
+          <div className="rounded-lg border bg-white p-4 shadow-sm">
+            <div className="mb-2">
+              <h2 className="text-xs font-medium text-gray-700">System status</h2>
             </div>
-            <ul className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <ul className="grid grid-cols-3 gap-2">
               <li className="flex items-center gap-2">
-                <span className="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
-                <span className="text-sm text-gray-800">Supabase</span>
+                <span className="inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
+                <span className="text-xs text-gray-800">Supabase</span>
               </li>
-              <li
-                className="flex items-center gap-2"
-                title={resendError || undefined}
-              >
+              <li className="flex items-center gap-2" title={resendError || undefined}>
                 <span
-                  className={`inline-flex h-2.5 w-2.5 rounded-full ${
+                  className={`inline-flex h-2 w-2 rounded-full ${
                     resendOk === null
                       ? "bg-yellow-400 animate-pulse"
                       : resendOk
@@ -1758,11 +1755,11 @@ export default function App() {
                       : "bg-red-500"
                   }`}
                 ></span>
-                <span className="text-sm text-gray-800">Resender</span>
+                <span className="text-xs text-gray-800">Resender</span>
               </li>
               <li className="flex items-center gap-2">
-                <span className="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
-                <span className="text-sm text-gray-800">React + Tailwind</span>
+                <span className="inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
+                <span className="text-xs text-gray-800">UI</span>
               </li>
             </ul>
           </div>
