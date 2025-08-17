@@ -1,6 +1,6 @@
 {
   "rewrites": [
     { "source": "/pass/(.*)", "destination": "/" },
-    { "source": "/(.*)", "destination": "/" }
+    { "source": "/checkins", "destination": "/" }
   ]
 }
