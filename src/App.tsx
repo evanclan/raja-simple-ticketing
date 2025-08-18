@@ -674,10 +674,9 @@ function EntryPassView({ token }: { token: string }) {
           <div className="text-center space-y-3">
             <div className="inline-block rounded-lg bg-white px-6 py-4 shadow-lg">
               <div className="text-red-600 text-3xl font-extrabold tracking-wide">
-                チェックイン
+                Check-in
               </div>
             </div>
-            <div className="text-white/90 text-xl">Checked in</div>
           </div>
         </div>
       )}
