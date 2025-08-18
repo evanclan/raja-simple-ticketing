@@ -268,7 +268,9 @@ function CheckinsView() {
                 <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">
                   こども参加人数（年少々以下）
                 </th>
-                <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">操作</th>
+                <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">
+                  操作
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -550,7 +552,9 @@ function EntryPassView({ token }: { token: string }) {
             {error}
           </div>
         ) : !participant ? (
-          <div className="rounded border bg-white p-6">見つかりませんでした。</div>
+          <div className="rounded border bg-white p-6">
+            見つかりませんでした。
+          </div>
         ) : (
           <div className="rounded border bg-white p-6 space-y-4">
             <div className="flex items-center justify-between">
@@ -668,7 +672,7 @@ function EntryPassView({ token }: { token: string }) {
       {checkin?.checked_in_at && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
           <div className="text-center">
-            <div className="text-white text-5xl font-extrabold tracking-wide drop-shadow-lg">
+            <div className="text-green-500 text-3xl font-extrabold tracking-wide drop-shadow-lg">
               チェックインしました
             </div>
             <div className="mt-2 text-white/90 text-xl">Checked in</div>
@@ -1745,14 +1749,19 @@ export default function App() {
         {!isCheckinsRoute && userEmail && (
           <div className="rounded-lg border bg-white p-4 shadow-sm">
             <div className="mb-2">
-              <h2 className="text-xs font-medium text-gray-700">システム状況</h2>
+              <h2 className="text-xs font-medium text-gray-700">
+                システム状況
+              </h2>
             </div>
             <ul className="grid grid-cols-3 gap-2">
               <li className="flex items-center gap-2">
                 <span className="inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
                 <span className="text-xs text-gray-800">Supabase</span>
               </li>
-              <li className="flex items-center gap-2" title={resendError || undefined}>
+              <li
+                className="flex items-center gap-2"
+                title={resendError || undefined}
+              >
                 <span
                   className={`inline-flex h-2 w-2 rounded-full ${
                     resendOk === null
@@ -1811,10 +1820,14 @@ export default function App() {
                 </div>
                 <div className="rounded border p-4 grid gap-3">
                   <div className="text-sm text-gray-700">
-                    変数は二重かっこで挿入できます（例）： {"{{name}}"}、 {"{{email}}"}、 {"{{adult}}"}、 {"{{child}}"}、 {"{{category}}"}、 {"{{total}}"}
+                    変数は二重かっこで挿入できます（例）： {"{{name}}"}、{" "}
+                    {"{{email}}"}、 {"{{adult}}"}、 {"{{child}}"}、{" "}
+                    {"{{category}}"}、 {"{{total}}"}
                   </div>
                   <label className="block">
-                    <span className="text-sm text-gray-700">送信者（From）</span>
+                    <span className="text-sm text-gray-700">
+                      送信者（From）
+                    </span>
                     <input
                       className="mt-1 w-full rounded border px-3 py-2"
                       value={fromDisplay}
@@ -1824,7 +1837,9 @@ export default function App() {
                   </label>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <label className="block">
-                      <span className="text-sm text-gray-700">テスト送信先</span>
+                      <span className="text-sm text-gray-700">
+                        テスト送信先
+                      </span>
                       <input
                         className="mt-1 w-full rounded border px-3 py-2"
                         type="email"
@@ -1863,7 +1878,9 @@ export default function App() {
                       />
                     </label>
                     <label className="block">
-                      <span className="text-sm text-gray-700">プレーンテキスト本文</span>
+                      <span className="text-sm text-gray-700">
+                        プレーンテキスト本文
+                      </span>
                       <textarea
                         ref={textRef}
                         rows={12}
@@ -2208,9 +2225,7 @@ export default function App() {
                     {/* Estimated Expected Calculation */}
                     <div className="mt-6 grid gap-4 rounded border p-4">
                       <div className="flex items-center justify-between">
-                        <h3 className="font-medium">
-                          予測見込計算（参考）
-                        </h3>
+                        <h3 className="font-medium">予測見込計算（参考）</h3>
                         <div className="flex items-center gap-2">
                           <button
                             onClick={calculateTotalsAcrossAllRows}
@@ -2278,7 +2293,9 @@ export default function App() {
                         <div className="text-sm text-gray-600 mr-3">
                           見込合計（計算式）
                         </div>
-                        <div className="text-xl font-bold">{estimatedTotal}</div>
+                        <div className="text-xl font-bold">
+                          {estimatedTotal}
+                        </div>
                       </div>
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 mt-4">
                         <div className="rounded bg-green-50 p-3">
@@ -2393,9 +2410,13 @@ export default function App() {
                           </div>
                           <div className="px-4 py-3">
                             {detailsLoading ? (
-                              <div className="text-sm text-gray-600">読み込み中…</div>
+                              <div className="text-sm text-gray-600">
+                                読み込み中…
+                              </div>
                             ) : details.length === 0 ? (
-                              <div className="text-sm text-gray-600">出席者のいる行がありません。</div>
+                              <div className="text-sm text-gray-600">
+                                出席者のいる行がありません。
+                              </div>
                             ) : (
                               <div className="table-scroll overflow-auto border rounded">
                                 <table className="min-w-full text-sm">
@@ -2475,7 +2496,9 @@ export default function App() {
                           disabled={isSendingTestPass}
                           className="rounded border px-3 py-1 text-sm text-fuchsia-700 border-fuchsia-300 bg-fuchsia-50 hover:bg-fuchsia-100 disabled:opacity-50"
                         >
-                          {isSendingTestPass ? "送信中…" : "テスト入場パスを送信"}
+                          {isSendingTestPass
+                            ? "送信中…"
+                            : "テスト入場パスを送信"}
                         </button>
                       </div>
                     </div>
@@ -2512,9 +2535,14 @@ export default function App() {
               </label>
               {authError && <p className="text-sm text-red-600">{authError}</p>}
               <div className="mt-2">
-                <button className="rounded bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700">サインイン</button>
+                <button className="rounded bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700">
+                  サインイン
+                </button>
               </div>
-              <p className="mt-2 text-xs text-gray-500">メモ：Supabase Auth で管理者ユーザーを作成してからサインインしてください。</p>
+              <p className="mt-2 text-xs text-gray-500">
+                メモ：Supabase Auth
+                で管理者ユーザーを作成してからサインインしてください。
+              </p>
             </form>
           </div>
         )}
