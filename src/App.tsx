@@ -671,11 +671,13 @@ function EntryPassView({ token }: { token: string }) {
       </main>
       {checkin?.checked_in_at && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-          <div className="text-center">
-            <div className="text-green-500 text-3xl font-extrabold tracking-wide drop-shadow-lg">
-              チェックインしました
+          <div className="text-center space-y-3">
+            <div className="inline-block rounded-lg bg-white px-6 py-4 shadow-lg">
+              <div className="text-black text-3xl font-extrabold tracking-wide">
+                チェックインしました
+              </div>
             </div>
-            <div className="mt-2 text-white/90 text-xl">Checked in</div>
+            <div className="text-white/90 text-xl">Checked in</div>
           </div>
         </div>
       )}
