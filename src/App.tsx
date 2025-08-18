@@ -673,8 +673,8 @@ function EntryPassView({ token }: { token: string }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
           <div className="text-center space-y-3">
             <div className="inline-block rounded-lg bg-white px-6 py-4 shadow-lg">
-              <div className="text-red-600 text-3xl font-extrabold tracking-wide">
-                受付完了しました！
+              <div className="text-green-600 text-3xl font-extrabold tracking-wide">
+                受付完了しました！✅
               </div>
             </div>
           </div>
