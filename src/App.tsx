@@ -234,11 +234,11 @@ function CheckinsView() {
   return (
     <div className="rounded-lg border bg-white p-6 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Checked-in participants</h2>
+        <h2 className="text-lg font-semibold">チェックイン済みの参加者</h2>
         <span className="text-sm text-gray-600">Total: {rows.length}</span>
       </div>
       {loading ? (
-        <div className="text-gray-600">Loading…</div>
+        <div className="text-gray-600">読み込み中…</div>
       ) : error ? (
         <div className="rounded border border-red-300 bg-red-50 p-3 text-red-800">
           {error}
@@ -268,9 +268,7 @@ function CheckinsView() {
                 <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">
                   こども参加人数（年少々以下）
                 </th>
-                <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">
-                  Actions
-                </th>
+                <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">操作</th>
               </tr>
             </thead>
             <tbody>
@@ -299,7 +297,7 @@ function CheckinsView() {
                       onClick={() => handleRemove(r.row_hash)}
                       className="rounded px-3 py-1 text-sm border text-red-700 border-red-300 bg-red-50 hover:bg-red-100"
                     >
-                      Remove
+                      削除
                     </button>
                   </td>
                 </tr>
@@ -541,29 +539,29 @@ function EntryPassView({ token }: { token: string }) {
     <div className="min-h-screen bg-gray-50 text-gray-900">
       <header className="border-b bg-white">
         <div className="mx-auto max-w-2xl px-4 pt-6 pb-4">
-          <h1 className="text-base sm:text-xl font-semibold">Entry Pass</h1>
+          <h1 className="text-base sm:text-xl font-semibold">入場パス</h1>
         </div>
       </header>
       <main className="mx-auto max-w-2xl px-4 py-8 space-y-6">
         {loading ? (
-          <div className="rounded border bg-white p-6">Loading…</div>
+          <div className="rounded border bg-white p-6">読み込み中…</div>
         ) : error ? (
           <div className="rounded border border-red-300 bg-red-50 p-6 text-red-800">
             {error}
           </div>
         ) : !participant ? (
-          <div className="rounded border bg-white p-6">Not found.</div>
+          <div className="rounded border bg-white p-6">見つかりませんでした。</div>
         ) : (
           <div className="rounded border bg-white p-6 space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Your details</h2>
+              <h2 className="text-lg font-semibold">ご登録内容</h2>
               {checkin?.checked_in_at ? (
                 <span className="rounded bg-green-100 px-2 py-1 text-sm text-green-800">
-                  Checked-in
+                  チェックイン済み
                 </span>
               ) : (
                 <span className="rounded bg-yellow-100 px-2 py-1 text-sm text-yellow-800">
-                  Not checked-in
+                  未チェックイン
                 </span>
               )}
             </div>
@@ -638,18 +636,17 @@ function EntryPassView({ token }: { token: string }) {
             </div>
             <div className="border-t pt-4 space-y-3">
               <p className="text-sm text-gray-700">
-                Present this page at the entrance. An admin will verify your
-                details and approve entry.
+                入場時にこの画面を提示してください。管理者が内容を確認し、入場を承認します。
               </p>
               <div className="grid gap-2 sm:grid-cols-[1fr_auto] items-end">
                 <label className="block">
-                  <span className="text-sm text-gray-700">Admin PIN</span>
+                  <span className="text-sm text-gray-700">管理者用PIN</span>
                   <input
                     className="mt-1 w-full rounded border px-3 py-2"
                     type="password"
                     value={pin}
                     onChange={(e) => setPin(e.target.value)}
-                    placeholder="Enter PIN (admin only)"
+                    placeholder="PINを入力（管理者のみ）"
                   />
                 </label>
                 <button
@@ -658,10 +655,10 @@ function EntryPassView({ token }: { token: string }) {
                   className="rounded bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 disabled:opacity-50"
                 >
                   {checkin?.checked_in_at
-                    ? "Already approved"
+                    ? "承認済み"
                     : submitting
-                    ? "Approving…"
-                    : "Approve entry"}
+                    ? "承認中…"
+                    : "入場を承認"}
                 </button>
               </div>
             </div>
@@ -1738,7 +1735,7 @@ export default function App() {
         {!isCheckinsRoute && userEmail && (
           <div className="rounded-lg border bg-white p-4 shadow-sm">
             <div className="mb-2">
-              <h2 className="text-xs font-medium text-gray-700">System status</h2>
+              <h2 className="text-xs font-medium text-gray-700">システム状況</h2>
             </div>
             <ul className="grid grid-cols-3 gap-2">
               <li className="flex items-center gap-2">
@@ -1755,7 +1752,7 @@ export default function App() {
                       : "bg-red-500"
                   }`}
                 ></span>
-                <span className="text-xs text-gray-800">Resender</span>
+                <span className="text-xs text-gray-800">Resend サービス</span>
               </li>
               <li className="flex items-center gap-2">
                 <span className="inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
@@ -1767,7 +1764,7 @@ export default function App() {
 
         {isAuthLoading ? (
           <div className="rounded-lg border bg-white p-6 shadow-sm">
-            <p className="text-gray-600">Loading…</p>
+            <p className="text-gray-600">読み込み中…</p>
           </div>
         ) : userEmail ? (
           <div className="rounded-lg border bg-white p-6 shadow-sm">
@@ -1794,22 +1791,20 @@ export default function App() {
             ) : activePage === "editMail" ? (
               <div className="grid gap-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-medium">Edit Auto Mail</h3>
+                  <h3 className="font-medium">自動メール編集</h3>
                   <button
                     onClick={() => setActivePage("main")}
                     className="rounded border px-3 py-1 text-sm text-gray-700 hover:bg-gray-50"
                   >
-                    Back
+                    戻る
                   </button>
                 </div>
                 <div className="rounded border p-4 grid gap-3">
                   <div className="text-sm text-gray-700">
-                    Use variables with double curly braces, for example:{" "}
-                    {"{{name}}"}, {"{{email}}"}, {"{{adult}}"}, {"{{child}}"},{" "}
-                    {"{{category}}"}, {"{{total}}"}.
+                    変数は二重かっこで挿入できます（例）： {"{{name}}"}、 {"{{email}}"}、 {"{{adult}}"}、 {"{{child}}"}、 {"{{category}}"}、 {"{{total}}"}
                   </div>
                   <label className="block">
-                    <span className="text-sm text-gray-700">From (sender)</span>
+                    <span className="text-sm text-gray-700">送信者（From）</span>
                     <input
                       className="mt-1 w-full rounded border px-3 py-2"
                       value={fromDisplay}
@@ -1819,9 +1814,7 @@ export default function App() {
                   </label>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <label className="block">
-                      <span className="text-sm text-gray-700">
-                        Test recipient
-                      </span>
+                      <span className="text-sm text-gray-700">テスト送信先</span>
                       <input
                         className="mt-1 w-full rounded border px-3 py-2"
                         type="email"
@@ -1836,12 +1829,12 @@ export default function App() {
                         disabled={isSendingTest}
                         className="rounded bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 disabled:opacity-50"
                       >
-                        {isSendingTest ? "Sending…" : "Send test email"}
+                        {isSendingTest ? "送信中…" : "テストメールを送信"}
                       </button>
                     </div>
                   </div>
                   <label className="block">
-                    <span className="text-sm text-gray-700">Subject</span>
+                    <span className="text-sm text-gray-700">件名</span>
                     <input
                       className="mt-1 w-full rounded border px-3 py-2"
                       value={subjectTemplate}
@@ -1850,7 +1843,7 @@ export default function App() {
                   </label>
                   <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                     <label className="block">
-                      <span className="text-sm text-gray-700">HTML body</span>
+                      <span className="text-sm text-gray-700">HTML本文</span>
                       <textarea
                         ref={htmlRef}
                         rows={12}
@@ -1860,9 +1853,7 @@ export default function App() {
                       />
                     </label>
                     <label className="block">
-                      <span className="text-sm text-gray-700">
-                        Plain text body
-                      </span>
+                      <span className="text-sm text-gray-700">プレーンテキスト本文</span>
                       <textarea
                         ref={textRef}
                         rows={12}
@@ -1895,7 +1886,7 @@ export default function App() {
                         }}
                         className="rounded border px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
                       >
-                        Insert {"{{"}
+                        差し込み {"{{"}
                         {v}
                         {"}}"}
                       </button>
@@ -1909,7 +1900,7 @@ export default function App() {
                       }}
                       className="rounded bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700"
                     >
-                      Save
+                      保存
                     </button>
                     <button
                       onClick={() => {
@@ -1924,7 +1915,7 @@ export default function App() {
                       }}
                       className="rounded border px-4 py-2 text-gray-700 hover:bg-gray-50"
                     >
-                      Reset to default
+                      既定にリセット
                     </button>
                   </div>
                 </div>
@@ -1959,7 +1950,7 @@ export default function App() {
                         type="text"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Search this page…"
+                        placeholder="このページを検索…"
                         className="rounded border px-3 py-1 text-sm"
                       />
                       <button
@@ -1967,7 +1958,7 @@ export default function App() {
                         disabled={page === 1}
                         className="rounded border px-3 py-1 text-sm text-gray-700 disabled:opacity-40"
                       >
-                        Prev
+                        前へ
                       </button>
                       <span className="text-sm text-gray-600">Page {page}</span>
                       <button
@@ -1975,7 +1966,7 @@ export default function App() {
                         disabled={!hasMore}
                         className="rounded border px-3 py-1 text-sm text-gray-700 disabled:opacity-40"
                       >
-                        Next
+                        次へ
                       </button>
                     </div>
                   </div>
@@ -1995,7 +1986,7 @@ export default function App() {
                             </th>
                           ))}
                           <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">
-                            Actions
+                            操作
                           </th>
                         </tr>
                       </thead>
@@ -2006,7 +1997,7 @@ export default function App() {
                               colSpan={2 + tableHeaders.length}
                               className="px-3 py-4 text-center text-gray-500"
                             >
-                              No data yet
+                              データがありません
                             </td>
                           </tr>
                         ) : (
@@ -2052,13 +2043,13 @@ export default function App() {
                   {/* Paid participants list */}
                   <div className="mt-10">
                     <div className="mb-2 flex items-center justify-between">
-                      <h3 className="font-medium">Paid participants list</h3>
+                      <h3 className="font-medium">支払い済み参加者一覧</h3>
                       <div className="flex items-center gap-2">
                         <button
                           onClick={loadPaidParticipants}
                           className="rounded border px-3 py-1 text-sm text-gray-700 hover:bg-gray-50"
                         >
-                          Refresh
+                          更新
                         </button>
                         <button
                           onClick={handleBulkSendPasses}
@@ -2066,8 +2057,8 @@ export default function App() {
                           className="rounded border px-3 py-1 text-sm text-purple-700 border-purple-300 bg-purple-50 hover:bg-purple-100 disabled:opacity-50"
                         >
                           {isBulkSendingPasses
-                            ? "Sending…"
-                            : "Send all entry passes"}
+                            ? "送信中…"
+                            : "入場パスを一括送信"}
                         </button>
                       </div>
                     </div>
@@ -2087,7 +2078,7 @@ export default function App() {
                               </th>
                             ))}
                             <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">
-                              Actions
+                              操作
                             </th>
                           </tr>
                         </thead>
@@ -2126,7 +2117,7 @@ export default function App() {
                                       disabled
                                       className="rounded px-3 py-1 text-sm border text-gray-500 border-gray-300 bg-gray-100 cursor-wait"
                                     >
-                                      Working…
+                                      処理中…
                                     </button>
                                   ) : pendingUnmarkHash === r.row_hash ? (
                                     <div className="flex items-center gap-2">
@@ -2136,7 +2127,7 @@ export default function App() {
                                         }
                                         className="rounded px-3 py-1 text-sm border text-red-700 border-red-300 bg-red-50 hover:bg-red-100"
                                       >
-                                        Confirm
+                                        確認
                                       </button>
                                       <button
                                         onClick={() =>
@@ -2144,7 +2135,7 @@ export default function App() {
                                         }
                                         className="rounded px-3 py-1 text-sm border text-gray-700 border-gray-300 bg-white hover:bg-gray-50"
                                       >
-                                        Cancel
+                                        キャンセル
                                       </button>
                                     </div>
                                   ) : (
@@ -2160,10 +2151,10 @@ export default function App() {
                                         className="rounded px-3 py-1 text-sm border text-blue-700 border-blue-300 bg-blue-50 hover:bg-blue-100 disabled:opacity-50"
                                       >
                                         {sentConfirmations.has(r.row_hash)
-                                          ? "Confirmation sent"
+                                          ? "確認メール送信済み"
                                           : sendingConfirmHash === r.row_hash
-                                          ? "Sending…"
-                                          : "Send confirmation"}
+                                          ? "送信中…"
+                                          : "確認メールを送信"}
                                       </button>
                                       <button
                                         onClick={() => handleSendEntryPass(r)}
@@ -2174,10 +2165,10 @@ export default function App() {
                                         className="rounded px-3 py-1 text-sm border text-purple-700 border-purple-300 bg-purple-50 hover:bg-purple-100 disabled:opacity-50"
                                       >
                                         {sentPasses.has(r.row_hash)
-                                          ? "Entry pass sent"
+                                          ? "入場パス送信済み"
                                           : sendingPassHash === r.row_hash
-                                          ? "Sending…"
-                                          : "Send entry pass"}
+                                          ? "送信中…"
+                                          : "入場パスを送信"}
                                       </button>
                                       <button
                                         onClick={() =>
@@ -2185,7 +2176,7 @@ export default function App() {
                                         }
                                         className="rounded px-3 py-1 text-sm border text-red-700 border-red-300 bg-red-50 hover:bg-red-100"
                                       >
-                                        Unmark paid
+                                        支払い済みを解除
                                       </button>
                                     </div>
                                   )}
@@ -2201,14 +2192,14 @@ export default function App() {
                         onClick={() => setActivePage("editMail")}
                         className="rounded border px-3 py-1 text-sm text-gray-700 hover:bg-gray-50"
                       >
-                        Edit auto mail
+                        自動メール編集
                       </button>
                     </div>
                     {/* Estimated Expected Calculation */}
                     <div className="mt-6 grid gap-4 rounded border p-4">
                       <div className="flex items-center justify-between">
                         <h3 className="font-medium">
-                          Estimated Expected Calculation
+                          予測見込計算（参考）
                         </h3>
                         <div className="flex items-center gap-2">
                           <button
@@ -2216,9 +2207,7 @@ export default function App() {
                             className="rounded border px-3 py-1 text-sm text-gray-700 hover:bg-gray-50"
                             disabled={calcLoading}
                           >
-                            {calcLoading
-                              ? "Calculating…"
-                              : "Recalculate (all rows)"}
+                            {calcLoading ? "計算中…" : "再計算（全行）"}
                           </button>
                           <button
                             onClick={async () => {
@@ -2227,14 +2216,14 @@ export default function App() {
                             }}
                             className="rounded border px-3 py-1 text-sm text-gray-700 hover:bg-gray-50"
                           >
-                            More details
+                            詳細を見る
                           </button>
                         </div>
                       </div>
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                         <div className="block">
                           <span className="text-sm text-gray-700">
-                            Detected adult header
+                            検出された大人人数の項目名
                           </span>
                           <div className="mt-1 text-sm text-gray-800">
                             {adultHeaderKey || "(not detected)"}
@@ -2242,7 +2231,7 @@ export default function App() {
                         </div>
                         <div className="block">
                           <span className="text-sm text-gray-700">
-                            Detected child header
+                            検出されたこども人数の項目名
                           </span>
                           <div className="mt-1 text-sm text-gray-800">
                             {childHeaderKey || "(not detected)"}
@@ -2250,7 +2239,7 @@ export default function App() {
                         </div>
                         <div className="block">
                           <span className="text-sm text-gray-700">
-                            Detected category header (参加区分)
+                            検出された参加区分の項目名
                           </span>
                           <div className="mt-1 text-sm text-gray-800">
                             {categoryHeaderKey || "(not detected)"}
@@ -2260,7 +2249,7 @@ export default function App() {
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                         <div className="rounded bg-gray-50 p-3">
                           <div className="text-xs text-gray-500">
-                            All registered adults (count)
+                            登録済み大人人数（合計）
                           </div>
                           <div className="text-lg font-semibold">
                             {adultCount}
@@ -2268,7 +2257,7 @@ export default function App() {
                         </div>
                         <div className="rounded bg-gray-50 p-3">
                           <div className="text-xs text-gray-500">
-                            All registered children (count)
+                            登録済みこども人数（合計）
                           </div>
                           <div className="text-lg font-semibold">
                             {childCount}
@@ -2277,16 +2266,14 @@ export default function App() {
                       </div>
                       <div className="flex items-center justify-end border-t pt-3">
                         <div className="text-sm text-gray-600 mr-3">
-                          Estimated total (formula)
+                          見込合計（計算式）
                         </div>
-                        <div className="text-xl font-bold">
-                          {estimatedTotal}
-                        </div>
+                        <div className="text-xl font-bold">{estimatedTotal}</div>
                       </div>
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 mt-4">
                         <div className="rounded bg-green-50 p-3">
                           <div className="text-xs text-gray-500">
-                            Paid adults (count)
+                            支払い済み大人人数（合計）
                           </div>
                           <div className="text-lg font-semibold">
                             {paidAdultCount}
@@ -2294,7 +2281,7 @@ export default function App() {
                         </div>
                         <div className="rounded bg-green-50 p-3">
                           <div className="text-xs text-gray-500">
-                            Paid children (count)
+                            支払い済みこども人数（合計）
                           </div>
                           <div className="text-lg font-semibold">
                             {paidChildCount}
@@ -2303,7 +2290,7 @@ export default function App() {
                       </div>
                       <div className="flex items-center justify-end border-t pt-3">
                         <div className="text-sm text-gray-600 mr-3">
-                          Paid total (formula)
+                          支払い合計（計算式）
                         </div>
                         <div className="text-xl font-bold">
                           {/** computed below via useMemo */}
@@ -2378,13 +2365,7 @@ export default function App() {
                         </div>
                       </div>
                       <p className="text-xs text-gray-500">
-                        Notes: Numbers are parsed from fields like "2名" or
-                        "２人" by extracting the first number. Pricing uses the
-                        fixed rules: RaJA family base ¥4,000 (covers 2 adults +
-                        2 children), extras ¥1,500/adult and ¥1,000/child;
-                        Others base ¥4,000 (covers 2 adults + 1 child), extras
-                        ¥2,000/adult and ¥1,000/child. Rows with zero attendees
-                        are ignored.
+                        備考：数値は「2名」「２人」などの文字列から最初の数値を抽出して計算します。料金は固定ルールを使用します：RaJA在籍者は基本4,000円（大人2名＋こども2名まで含む）、超過は大人1,500円/人・こども1,000円/人。その他は基本4,000円（大人2名＋こども1名まで含む）、超過は大人2,000円/人・こども1,000円/人。人数0の行は集計対象外です。
                       </p>
                     </div>
                     {/* Details Modal */}
@@ -2392,23 +2373,19 @@ export default function App() {
                       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
                         <div className="max-h-[80vh] w-full max-w-3xl overflow-hidden rounded bg-white shadow-lg">
                           <div className="flex items-center justify-between border-b px-4 py-3">
-                            <h4 className="font-medium">Per-user totals</h4>
+                            <h4 className="font-medium">ユーザー別合計</h4>
                             <button
                               onClick={() => setIsDetailsOpen(false)}
                               className="rounded border px-2 py-1 text-sm text-gray-700 hover:bg-gray-50"
                             >
-                              Close
+                              閉じる
                             </button>
                           </div>
                           <div className="px-4 py-3">
                             {detailsLoading ? (
-                              <div className="text-sm text-gray-600">
-                                Loading…
-                              </div>
+                              <div className="text-sm text-gray-600">読み込み中…</div>
                             ) : details.length === 0 ? (
-                              <div className="text-sm text-gray-600">
-                                No rows with attendees.
-                              </div>
+                              <div className="text-sm text-gray-600">出席者のいる行がありません。</div>
                             ) : (
                               <div className="table-scroll overflow-auto border rounded">
                                 <table className="min-w-full text-sm">
@@ -2430,7 +2407,7 @@ export default function App() {
                                         参加区分
                                       </th>
                                       <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">
-                                        Total (¥)
+                                        合計（¥）
                                       </th>
                                     </tr>
                                   </thead>
@@ -2471,7 +2448,7 @@ export default function App() {
                     {/* Moved: Entry pass test sender (to bottom to avoid confusion with bulk send) */}
                     <div className="mt-10">
                       <div className="mb-2">
-                        <h3 className="font-medium">Entry pass (test send)</h3>
+                        <h3 className="font-medium">入場パス（テスト送信）</h3>
                       </div>
                       <div className="flex items-center gap-2">
                         <input
@@ -2480,7 +2457,7 @@ export default function App() {
                           onChange={(e) =>
                             setEntryPassTestRecipient(e.target.value)
                           }
-                          placeholder="test@example.com"
+                          placeholder="test@example.com（テスト用）"
                           className="rounded border px-2 py-1 text-sm"
                         />
                         <button
@@ -2488,9 +2465,7 @@ export default function App() {
                           disabled={isSendingTestPass}
                           className="rounded border px-3 py-1 text-sm text-fuchsia-700 border-fuchsia-300 bg-fuchsia-50 hover:bg-fuchsia-100 disabled:opacity-50"
                         >
-                          {isSendingTestPass
-                            ? "Sending…"
-                            : "Send test entry pass"}
+                          {isSendingTestPass ? "送信中…" : "テスト入場パスを送信"}
                         </button>
                       </div>
                     </div>
@@ -2501,10 +2476,10 @@ export default function App() {
           </div>
         ) : (
           <div className="rounded-lg border bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold mb-4">Admin sign in</h2>
+            <h2 className="text-lg font-semibold mb-4">管理者サインイン</h2>
             <form onSubmit={handleSignIn} className="grid gap-3 max-w-sm">
               <label className="block">
-                <span className="text-sm text-gray-700">Email</span>
+                <span className="text-sm text-gray-700">メールアドレス</span>
                 <input
                   className="mt-1 w-full rounded border px-3 py-2"
                   type="email"
@@ -2515,11 +2490,11 @@ export default function App() {
                 />
               </label>
               <label className="block">
-                <span className="text-sm text-gray-700">Password</span>
+                <span className="text-sm text-gray-700">パスワード</span>
                 <input
                   className="mt-1 w-full rounded border px-3 py-2"
                   type="password"
-                  placeholder="Your password"
+                  placeholder="パスワード"
                   value={signinPassword}
                   onChange={(e) => setSigninPassword(e.target.value)}
                   required
@@ -2527,14 +2502,9 @@ export default function App() {
               </label>
               {authError && <p className="text-sm text-red-600">{authError}</p>}
               <div className="mt-2">
-                <button className="rounded bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700">
-                  Sign in
-                </button>
+                <button className="rounded bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700">サインイン</button>
               </div>
-              <p className="mt-2 text-xs text-gray-500">
-                Tip: Create an admin user in Supabase Auth (Dashboard → Auth →
-                Users), then sign in here.
-              </p>
+              <p className="mt-2 text-xs text-gray-500">メモ：Supabase Auth で管理者ユーザーを作成してからサインインしてください。</p>
             </form>
           </div>
         )}
