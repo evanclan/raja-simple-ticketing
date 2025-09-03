@@ -1,6 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "./lib/supabaseClient";
 
+// Simple fetch with timeout to avoid indefinite hanging during network issues
+async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+  timeoutMs: number = 12000
+): Promise<Response> {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const resp = await fetch(input, { ...(init || {}), signal: controller.signal });
+    return resp;
+  } finally {
+    clearTimeout(id);
+  }
+}
+
 function CheckinsView() {
   const supabaseClient = supabase;
   const [loading, setLoading] = useState<boolean>(true);
@@ -465,11 +481,16 @@ function EntryPassView({ token }: { token: string }) {
   }
 
   useEffect(() => {
+    if (!supabaseUrl) {
+      setError("Supabase is not configured.");
+      setLoading(false);
+      return;
+    }
     (async () => {
       try {
         setLoading(true);
         setError("");
-        const resp = await fetch(`${supabaseUrl}/functions/v1/entry_pass`, {
+        const resp = await fetchWithTimeout(`${supabaseUrl}/functions/v1/entry_pass`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -493,7 +514,11 @@ function EntryPassView({ token }: { token: string }) {
         );
         setCheckin(json?.checkin ?? null);
       } catch (e: any) {
-        setError(e?.message || String(e));
+        if (e?.name === "AbortError") {
+          setError("Request timed out. Please check your connection and try again.");
+        } else {
+          setError(e?.message || String(e));
+        }
       } finally {
         setLoading(false);
       }
@@ -721,6 +746,7 @@ export default function App() {
   const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
   const [resendOk, setResendOk] = useState<boolean | null>(null);
   const [resendError, setResendError] = useState<string | null>(null);
+  const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
   // Participants view state
   const [tableHeaders, setTableHeaders] = useState<string[]>([]);
@@ -832,25 +858,39 @@ export default function App() {
 
   useEffect(() => {
     // Initialize auth session
-    (async () => {
-      const { data } = await supabase.auth.getSession();
-      const email = data.session?.user?.email ?? null;
-      setUserEmail(email);
-      setUserToken(data.session?.access_token ?? null);
+    if (!isSupabaseConfigured) {
       setIsAuthLoading(false);
+      return;
+    }
+    let unsub: { unsubscribe: () => void } | null = null;
+    // Fallback: stop loading if something hangs longer than 8s
+    const authTimeout = setTimeout(() => setIsAuthLoading(false), 8000);
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const email = data.session?.user?.email ?? null;
+        setUserEmail(email);
+        setUserToken(data.session?.access_token ?? null);
+      } finally {
+        clearTimeout(authTimeout);
+        setIsAuthLoading(false);
+      }
     })();
 
-    const { data: sub } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        setUserEmail(session?.user?.email ?? null);
-        setUserToken(session?.access_token ?? null);
-      }
-    );
+    const sub = supabase.auth.onAuthStateChange(async (_event, session) => {
+      setUserEmail(session?.user?.email ?? null);
+      setUserToken(session?.access_token ?? null);
+    });
+    // Align with current supabase-js v2 API
+    // sub.data.subscription.unsubscribe() in examples; keep safe access:
+    unsub = sub?.data?.subscription ?? (sub as any)?.subscription ?? null;
 
     return () => {
-      sub.subscription.unsubscribe();
+      try {
+        unsub?.unsubscribe?.();
+      } catch {}
     };
-  }, []);
+  }, [isSupabaseConfigured]);
 
   useEffect(() => {
     // Load sent confirmations
@@ -882,21 +922,27 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!isSupabaseConfigured) return;
     (async () => {
       try {
-        const resp = await fetch(`${supabaseUrl}/functions/v1/resend_health`, {
+        const resp = await fetchWithTimeout(`${supabaseUrl}/functions/v1/resend_health`, {
           method: "GET",
           headers: { Authorization: `Bearer ${supabaseAnonKey}` },
         });
         const json = await resp.json().catch(() => ({} as any));
         setResendOk(Boolean(json?.ok));
         setResendError(json?.ok ? null : json?.error || null);
-      } catch {
-        setResendOk(false);
-        setResendError("Request failed");
+      } catch (e: any) {
+        if (e?.name === "AbortError") {
+          setResendOk(false);
+          setResendError("Request timed out");
+        } else {
+          setResendOk(false);
+          setResendError("Request failed");
+        }
       }
     })();
-  }, [supabaseUrl, supabaseAnonKey]);
+  }, [supabaseUrl, supabaseAnonKey, isSupabaseConfigured]);
 
   const isDisabled = useMemo(() => isSyncing, [isSyncing]);
 
@@ -1747,6 +1793,11 @@ export default function App() {
         </div>
       </header>
       <main className="mx-auto max-w-5xl px-4 py-10 space-y-6">
+        {!isSupabaseConfigured && (
+          <div className="rounded-lg border bg-white p-6 shadow-sm">
+            <p className="text-red-700">Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.</p>
+          </div>
+        )}
         {!isCheckinsRoute && userEmail && (
           <div className="rounded-lg border bg-white p-4 shadow-sm">
             <div className="mb-2">
