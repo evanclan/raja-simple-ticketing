@@ -1,5 +1,81 @@
 @import "tailwindcss";
 
+/* Theme: Modern Red */
+@theme {
+  /* Remap indigo scale to a vibrant red palette (primary actions) */
+  --color-indigo-50: #fff1f2;
+  --color-indigo-100: #ffe4e6;
+  --color-indigo-200: #fecdd3;
+  --color-indigo-300: #fda4af;
+  --color-indigo-400: #fb7185;
+  --color-indigo-500: #f43f5e;
+  --color-indigo-600: #e11d48; /* primary */
+  --color-indigo-700: #be123c;
+  --color-indigo-800: #9f1239;
+  --color-indigo-900: #881337;
+
+  /* Unify auxiliary accent scales to softer red/rose hues */
+  --color-blue-50: #fff1f2;
+  --color-blue-100: #ffe4e6;
+  --color-blue-200: #fecdd3;
+  --color-blue-300: #fda4af;
+  --color-blue-400: #fb7185;
+  --color-blue-500: #f43f5e;
+  --color-blue-600: #e11d48;
+  --color-blue-700: #be123c;
+  --color-blue-800: #9f1239;
+  --color-blue-900: #881337;
+
+  --color-purple-50: #fff1f2;
+  --color-purple-100: #ffe4e6;
+  --color-purple-200: #fecdd3;
+  --color-purple-300: #fda4af;
+  --color-purple-400: #fb7185;
+  --color-purple-500: #f43f5e;
+  --color-purple-600: #e11d48;
+  --color-purple-700: #be123c;
+  --color-purple-800: #9f1239;
+  --color-purple-900: #881337;
+
+  --color-fuchsia-50: #fff1f2;
+  --color-fuchsia-100: #ffe4e6;
+  --color-fuchsia-200: #fecdd3;
+  --color-fuchsia-300: #fda4af;
+  --color-fuchsia-400: #fb7185;
+  --color-fuchsia-500: #f43f5e;
+  --color-fuchsia-600: #e11d48;
+  --color-fuchsia-700: #be123c;
+  --color-fuchsia-800: #9f1239;
+  --color-fuchsia-900: #881337;
+}
+
+/* Global polish */
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+body {
+  background: radial-gradient(
+      1200px 500px at 10% -10%,
+      rgba(244, 63, 94, 0.08),
+      transparent
+    ),
+    radial-gradient(
+      1000px 400px at 90% -10%,
+      rgba(225, 29, 72, 0.06),
+      transparent
+    ),
+    radial-gradient(
+      900px 400px at 50% 120%,
+      rgba(190, 18, 60, 0.06),
+      transparent
+    );
+}
+::selection {
+  background: #ef4444;
+  color: white;
+}
+
 /* Safe area for iOS notch */
 :root {
   padding-top: env(safe-area-inset-top);

@@ -10,7 +10,10 @@ async function fetchWithTimeout(
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const resp = await fetch(input, { ...(init || {}), signal: controller.signal });
+    const resp = await fetch(input, {
+      ...(init || {}),
+      signal: controller.signal,
+    });
     return resp;
   } finally {
     clearTimeout(id);
@@ -264,27 +267,27 @@ function CheckinsView() {
       ) : (
         <div className="table-scroll overflow-auto border rounded">
           <table className="min-w-full text-sm">
-            <thead className="bg-gray-50">
+            <thead className="bg-red-50/60 border-b border-red-100">
               <tr>
-                <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">
+                <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
                   メールアドレス
                 </th>
-                <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">
+                <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
                   代表者氏名
                 </th>
-                <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">
+                <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
                   参加区分
                 </th>
-                <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">
+                <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
                   おとな参加人数（中学生以上)
                 </th>
-                <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">
+                <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
                   こども参加人数（年少～小学生）
                 </th>
-                <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">
+                <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
                   こども参加人数（年少々以下）
                 </th>
-                <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">
+                <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
                   操作
                 </th>
               </tr>
@@ -490,13 +493,16 @@ function EntryPassView({ token }: { token: string }) {
       try {
         setLoading(true);
         setError("");
-        const resp = await fetchWithTimeout(`${supabaseUrl}/functions/v1/entry_pass`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ action: "resolve", token }),
-        });
+        const resp = await fetchWithTimeout(
+          `${supabaseUrl}/functions/v1/entry_pass`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ action: "resolve", token }),
+          }
+        );
         if (!resp.ok) {
           const txt = await resp.text();
           throw new Error(`HTTP ${resp.status}: ${txt}`);
@@ -515,7 +521,9 @@ function EntryPassView({ token }: { token: string }) {
         setCheckin(json?.checkin ?? null);
       } catch (e: any) {
         if (e?.name === "AbortError") {
-          setError("Request timed out. Please check your connection and try again.");
+          setError(
+            "Request timed out. Please check your connection and try again."
+          );
         } else {
           setError(e?.message || String(e));
         }
@@ -564,9 +572,11 @@ function EntryPassView({ token }: { token: string }) {
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
-      <header className="border-b bg-white">
+      <header className="border-b border-red-100 bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60">
         <div className="mx-auto max-w-2xl px-4 pt-6 pb-4">
-          <h1 className="text-base sm:text-xl font-semibold">入場パス</h1>
+          <h1 className="text-base sm:text-xl font-semibold text-indigo-700">
+            入場パス
+          </h1>
         </div>
       </header>
       <main className="mx-auto max-w-2xl px-4 py-8 space-y-6">
@@ -598,7 +608,7 @@ function EntryPassView({ token }: { token: string }) {
               <table className="min-w-full text-sm">
                 <tbody>
                   <tr>
-                    <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
+                    <td className="px-3 py-2 text-indigo-700 whitespace-nowrap">
                       メールアドレス
                     </td>
                     <td className="px-3 py-2 text-gray-900 whitespace-nowrap">
@@ -606,7 +616,7 @@ function EntryPassView({ token }: { token: string }) {
                     </td>
                   </tr>
                   <tr>
-                    <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
+                    <td className="px-3 py-2 text-indigo-700 whitespace-nowrap">
                       代表者氏名
                     </td>
                     <td className="px-3 py-2 text-gray-900 whitespace-nowrap">
@@ -614,7 +624,7 @@ function EntryPassView({ token }: { token: string }) {
                     </td>
                   </tr>
                   <tr>
-                    <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
+                    <td className="px-3 py-2 text-indigo-700 whitespace-nowrap">
                       参加区分
                     </td>
                     <td className="px-3 py-2 text-gray-900 whitespace-nowrap">
@@ -622,7 +632,7 @@ function EntryPassView({ token }: { token: string }) {
                     </td>
                   </tr>
                   <tr>
-                    <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
+                    <td className="px-3 py-2 text-indigo-700 whitespace-nowrap">
                       おとな参加人数（中学生以上)
                     </td>
                     <td className="px-3 py-2 text-gray-900 whitespace-nowrap">
@@ -635,7 +645,7 @@ function EntryPassView({ token }: { token: string }) {
                     </td>
                   </tr>
                   <tr>
-                    <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
+                    <td className="px-3 py-2 text-indigo-700 whitespace-nowrap">
                       こども参加人数（年少～小学生）
                     </td>
                     <td className="px-3 py-2 text-gray-900 whitespace-nowrap">
@@ -648,7 +658,7 @@ function EntryPassView({ token }: { token: string }) {
                     </td>
                   </tr>
                   <tr>
-                    <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
+                    <td className="px-3 py-2 text-indigo-700 whitespace-nowrap">
                       こども参加人数（年少々以下）
                     </td>
                     <td className="px-3 py-2 text-gray-900 whitespace-nowrap">
@@ -671,7 +681,7 @@ function EntryPassView({ token }: { token: string }) {
                 <label className="block">
                   <span className="text-sm text-gray-700">管理者用PIN</span>
                   <input
-                    className="mt-1 w-full rounded border px-3 py-2"
+                    className="mt-1 w-full rounded border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-300"
                     type="password"
                     value={pin}
                     onChange={(e) => setPin(e.target.value)}
@@ -925,10 +935,13 @@ export default function App() {
     if (!isSupabaseConfigured) return;
     (async () => {
       try {
-        const resp = await fetchWithTimeout(`${supabaseUrl}/functions/v1/resend_health`, {
-          method: "GET",
-          headers: { Authorization: `Bearer ${supabaseAnonKey}` },
-        });
+        const resp = await fetchWithTimeout(
+          `${supabaseUrl}/functions/v1/resend_health`,
+          {
+            method: "GET",
+            headers: { Authorization: `Bearer ${supabaseAnonKey}` },
+          }
+        );
         const json = await resp.json().catch(() => ({} as any));
         setResendOk(Boolean(json?.ok));
         setResendError(json?.ok ? null : json?.error || null);
@@ -1764,10 +1777,10 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
-      <header className="border-b bg-white">
+      <header className="border-b border-red-100 bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60">
         <div className="mx-auto max-w-5xl px-4 pt-6 pb-4 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
           <div className="flex items-center gap-2 sm:gap-3">
-            <h1 className="text-base sm:text-xl font-semibold">
+            <h1 className="text-base sm:text-xl font-semibold text-indigo-700">
               RaJA Ticketing System
             </h1>
             <p className="text-xs sm:text-sm text-gray-900 opacity-60">
@@ -1778,13 +1791,13 @@ export default function App() {
             <nav className="flex w-full sm:w-auto items-center gap-2 text-sm justify-start sm:justify-end">
               <button
                 onClick={() => (window.location.href = "/")}
-                className="rounded border px-3 py-1 text-gray-700 hover:bg-gray-50"
+                className="rounded border px-3 py-1 text-indigo-700 border-indigo-300 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-400"
               >
                 Dashboard
               </button>
               <button
                 onClick={() => (window.location.href = "/checkins")}
-                className="rounded border px-3 py-1 text-gray-700 hover:bg-gray-50"
+                className="rounded border px-3 py-1 text-indigo-700 border-indigo-300 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-400"
               >
                 Checked-in
               </button>
@@ -1795,7 +1808,10 @@ export default function App() {
       <main className="mx-auto max-w-5xl px-4 py-10 space-y-6">
         {!isSupabaseConfigured && (
           <div className="rounded-lg border bg-white p-6 shadow-sm">
-            <p className="text-red-700">Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.</p>
+            <p className="text-red-700">
+              Supabase is not configured. Set VITE_SUPABASE_URL and
+              VITE_SUPABASE_ANON_KEY.
+            </p>
           </div>
         )}
         {!isCheckinsRoute && userEmail && (
@@ -1850,7 +1866,7 @@ export default function App() {
                   </span>
                   <button
                     onClick={handleSignOut}
-                    className="rounded border px-3 py-1 text-gray-700 hover:bg-gray-50"
+                    className="rounded border px-3 py-1 text-indigo-700 border-indigo-300 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-400"
                   >
                     Sign out
                   </button>
@@ -1865,7 +1881,7 @@ export default function App() {
                   <h3 className="font-medium">自動メール編集</h3>
                   <button
                     onClick={() => setActivePage("main")}
-                    className="rounded border px-3 py-1 text-sm text-gray-700 hover:bg-gray-50"
+                    className="rounded border px-3 py-1 text-sm text-indigo-700 border-indigo-300 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-400"
                   >
                     戻る
                   </button>
@@ -1881,7 +1897,7 @@ export default function App() {
                       送信者（From）
                     </span>
                     <input
-                      className="mt-1 w-full rounded border px-3 py-2"
+                      className="mt-1 w-full rounded border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-300"
                       value={fromDisplay}
                       onChange={(e) => setFromDisplay(e.target.value)}
                       placeholder="RaJA <no-reply@info.raja-international.com>"
@@ -1913,7 +1929,7 @@ export default function App() {
                   <label className="block">
                     <span className="text-sm text-gray-700">件名</span>
                     <input
-                      className="mt-1 w-full rounded border px-3 py-2"
+                      className="mt-1 w-full rounded border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-300"
                       value={subjectTemplate}
                       onChange={(e) => setSubjectTemplate(e.target.value)}
                     />
@@ -1924,7 +1940,7 @@ export default function App() {
                       <textarea
                         ref={htmlRef}
                         rows={12}
-                        className="mt-1 w-full rounded border px-3 py-2 font-mono text-sm"
+                        className="mt-1 w-full rounded border px-3 py-2 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-300"
                         value={htmlTemplate}
                         onChange={(e) => setHtmlTemplate(e.target.value)}
                       />
@@ -1936,7 +1952,7 @@ export default function App() {
                       <textarea
                         ref={textRef}
                         rows={12}
-                        className="mt-1 w-full rounded border px-3 py-2 font-mono text-sm"
+                        className="mt-1 w-full rounded border px-3 py-2 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-300"
                         value={textTemplate}
                         onChange={(e) => setTextTemplate(e.target.value)}
                       />
@@ -1963,7 +1979,7 @@ export default function App() {
                             setTextTemplate((prev) => prev + token);
                           }
                         }}
-                        className="rounded border px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
+                        className="rounded border px-2 py-1 text-xs text-indigo-700 border-indigo-300 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-300"
                       >
                         差し込み {"{{"}
                         {v}
@@ -1992,7 +2008,7 @@ export default function App() {
                         );
                         setTimeout(() => persistTemplates(), 0);
                       }}
-                      className="rounded border px-4 py-2 text-gray-700 hover:bg-gray-50"
+                      className="rounded border px-4 py-2 text-indigo-700 border-indigo-300 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-400"
                     >
                       既定にリセット
                     </button>
@@ -2030,12 +2046,12 @@ export default function App() {
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         placeholder="このページを検索…"
-                        className="rounded border px-3 py-1 text-sm"
+                        className="rounded border px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-300"
                       />
                       <button
                         onClick={() => loadParticipants(Math.max(1, page - 1))}
                         disabled={page === 1}
-                        className="rounded border px-3 py-1 text-sm text-gray-700 disabled:opacity-40"
+                        className="rounded border px-3 py-1 text-sm text-indigo-700 border-indigo-300 bg-white hover:bg-indigo-50 disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-indigo-300"
                       >
                         前へ
                       </button>
@@ -2043,7 +2059,7 @@ export default function App() {
                       <button
                         onClick={() => loadParticipants(page + 1)}
                         disabled={!hasMore}
-                        className="rounded border px-3 py-1 text-sm text-gray-700 disabled:opacity-40"
+                        className="rounded border px-3 py-1 text-sm text-indigo-700 border-indigo-300 bg-white hover:bg-indigo-50 disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-indigo-300"
                       >
                         次へ
                       </button>
@@ -2051,20 +2067,20 @@ export default function App() {
                   </div>
                   <div className="table-scroll overflow-auto border rounded">
                     <table className="min-w-full text-sm">
-                      <thead className="bg-gray-50">
+                      <thead className="bg-red-50/60 border-b border-red-100">
                         <tr>
-                          <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">
+                          <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
                             #
                           </th>
                           {tableHeaders.map((h, idx) => (
                             <th
                               key={`${h || ""}-${idx}`}
-                              className="px-3 py-2 text-left text-gray-700 whitespace-nowrap"
+                              className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap"
                             >
                               {h || "(empty)"}
                             </th>
                           ))}
-                          <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">
+                          <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
                             操作
                           </th>
                         </tr>
@@ -2126,7 +2142,7 @@ export default function App() {
                       <div className="flex items-center gap-2">
                         <button
                           onClick={loadPaidParticipants}
-                          className="rounded border px-3 py-1 text-sm text-gray-700 hover:bg-gray-50"
+                          className="rounded border px-3 py-1 text-sm text-indigo-700 border-indigo-300 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-300"
                         >
                           更新
                         </button>
@@ -2143,20 +2159,20 @@ export default function App() {
                     </div>
                     <div className="table-scroll overflow-auto border rounded">
                       <table className="min-w-full text-sm">
-                        <thead className="bg-gray-50">
+                        <thead className="bg-red-50/60 border-b border-red-100">
                           <tr>
-                            <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">
+                            <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
                               #
                             </th>
                             {paidHeaders.map((h, idx) => (
                               <th
                                 key={`paid-${idx}-${h || ""}`}
-                                className="px-3 py-2 text-left text-gray-700 whitespace-nowrap"
+                                className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap"
                               >
                                 {h || "(empty)"}
                               </th>
                             ))}
-                            <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">
+                            <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
                               操作
                             </th>
                           </tr>
@@ -2269,7 +2285,7 @@ export default function App() {
                     <div className="mt-3">
                       <button
                         onClick={() => setActivePage("editMail")}
-                        className="rounded border px-3 py-1 text-sm text-gray-700 hover:bg-gray-50"
+                        className="rounded border px-3 py-1 text-sm text-indigo-700 border-indigo-300 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-300"
                       >
                         自動メール編集
                       </button>
@@ -2281,7 +2297,7 @@ export default function App() {
                         <div className="flex items-center gap-2">
                           <button
                             onClick={calculateTotalsAcrossAllRows}
-                            className="rounded border px-3 py-1 text-sm text-gray-700 hover:bg-gray-50"
+                            className="rounded border px-3 py-1 text-sm text-indigo-700 border-indigo-300 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-300"
                             disabled={calcLoading}
                           >
                             {calcLoading ? "計算中…" : "再計算（全行）"}
@@ -2291,7 +2307,7 @@ export default function App() {
                               await loadDetailsAcrossAllRows();
                               setIsDetailsOpen(true);
                             }}
-                            className="rounded border px-3 py-1 text-sm text-gray-700 hover:bg-gray-50"
+                            className="rounded border px-3 py-1 text-sm text-indigo-700 border-indigo-300 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-300"
                           >
                             詳細を見る
                           </button>
@@ -2455,7 +2471,7 @@ export default function App() {
                             <h4 className="font-medium">ユーザー別合計</h4>
                             <button
                               onClick={() => setIsDetailsOpen(false)}
-                              className="rounded border px-2 py-1 text-sm text-gray-700 hover:bg-gray-50"
+                              className="rounded border px-2 py-1 text-sm text-indigo-700 border-indigo-300 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-300"
                             >
                               閉じる
                             </button>
@@ -2472,24 +2488,24 @@ export default function App() {
                             ) : (
                               <div className="table-scroll overflow-auto border rounded">
                                 <table className="min-w-full text-sm">
-                                  <thead className="bg-gray-50">
+                                  <thead className="bg-red-50/60 border-b border-red-100">
                                     <tr>
-                                      <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">
+                                      <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
                                         #
                                       </th>
-                                      <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">
+                                      <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
                                         代表者氏名
                                       </th>
-                                      <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">
+                                      <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
                                         おとな参加人数（中学生以上）
                                       </th>
-                                      <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">
+                                      <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
                                         こども参加人数（年少～小学生）
                                       </th>
-                                      <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">
+                                      <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
                                         参加区分
                                       </th>
-                                      <th className="px-3 py-2 text-left text-gray-700 whitespace-nowrap">
+                                      <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
                                         合計（¥）
                                       </th>
                                     </tr>
