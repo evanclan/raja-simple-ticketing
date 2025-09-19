@@ -2125,6 +2125,53 @@ export default function App() {
                   >
                     {isSyncing ? "Syncing…" : "Sync now"}
                   </button>
+                  <button
+                    onClick={async () => {
+                      if (!userToken) {
+                        alert("Please sign in first");
+                        return;
+                      }
+                      const normalizedId = extractSheetId(sheetId);
+                      setSheetId(normalizedId);
+                      try {
+                        setIsSyncing(true);
+                        setResultMessage("");
+                        const resp = await fetch(
+                          `${supabaseUrl}/functions/v1/sync_participants`,
+                          {
+                            method: "POST",
+                            headers: {
+                              "Content-Type": "application/json",
+                              Authorization: `Bearer ${userToken}`,
+                            },
+                            body: JSON.stringify({
+                              action: "export_paid",
+                              sheetId: normalizedId,
+                              range,
+                            }),
+                          }
+                        );
+                        if (!resp.ok) {
+                          const txt = await resp.text();
+                          throw new Error(`HTTP ${resp.status}: ${txt}`);
+                        }
+                        const data = await resp.json();
+                        setResultMessage(
+                          `OK: exported ${data?.rowsExported ?? 0} paid rows`
+                        );
+                      } catch (e: any) {
+                        setResultMessage(
+                          `Export failed: ${e?.message ?? String(e)}`
+                        );
+                      } finally {
+                        setIsSyncing(false);
+                      }
+                    }}
+                    disabled={isDisabled}
+                    className={`rounded bg-emerald-600 px-4 py-2 text-white hover:bg-emerald-700 disabled:opacity-50`}
+                  >
+                    Export paid to sheet
+                  </button>
                   {resultMessage && (
                     <span className="text-sm text-gray-700" role="status">
                       {resultMessage}

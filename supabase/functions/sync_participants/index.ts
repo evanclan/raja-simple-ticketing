@@ -8,7 +8,9 @@ type SheetSyncRequest = {
   range?: string; // e.g. "Sheet1!A:Z"
 };
 
-const SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets.readonly";
+const SHEETS_SCOPE_READONLY =
+  "https://www.googleapis.com/auth/spreadsheets.readonly";
+const SHEETS_SCOPE_RW = "https://www.googleapis.com/auth/spreadsheets";
 
 function getCorsHeaders(origin: string | null): Record<string, string> {
   const base: Record<string, string> = {
@@ -42,7 +44,9 @@ async function sha256Hex(input: string): Promise<string> {
     .join("");
 }
 
-async function getAccessTokenFromServiceAccount(): Promise<string> {
+async function getAccessTokenFromServiceAccount(
+  scope: string
+): Promise<string> {
   const clientEmail = Deno.env.get("GOOGLE_CLIENT_EMAIL");
   const privateKeyRaw = Deno.env.get("GOOGLE_PRIVATE_KEY");
   if (!clientEmail || !privateKeyRaw) {
@@ -51,7 +55,7 @@ async function getAccessTokenFromServiceAccount(): Promise<string> {
   const privateKey = privateKeyRaw.replace(/\\n/g, "\n");
   const key = await importPKCS8(privateKey, "RS256");
   const now = Math.floor(Date.now() / 1000);
-  const assertion = await new SignJWT({ scope: SHEETS_SCOPE })
+  const assertion = await new SignJWT({ scope })
     .setProtectedHeader({ alg: "RS256", typ: "JWT" })
     .setIssuer(clientEmail)
     .setSubject(clientEmail)
@@ -88,7 +92,9 @@ async function fetchSheetValues(
   let values: string[][] = [];
   // Prefer service account for private sheets
   if (hasSvcCreds) {
-    const accessToken = await getAccessTokenFromServiceAccount();
+    const accessToken = await getAccessTokenFromServiceAccount(
+      SHEETS_SCOPE_READONLY
+    );
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(
       range
     )}`;
@@ -140,7 +146,9 @@ async function getFirstSheetTitle(sheetId: string): Promise<string> {
   );
 
   if (hasSvcCreds) {
-    const accessToken = await getAccessTokenFromServiceAccount();
+    const accessToken = await getAccessTokenFromServiceAccount(
+      SHEETS_SCOPE_READONLY
+    );
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}?fields=sheets(properties(title,hidden))`;
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -186,6 +194,38 @@ async function getFirstSheetTitle(sheetId: string): Promise<string> {
     throw new Error(
       "Missing Google credentials: set GOOGLE_CLIENT_EMAIL and GOOGLE_PRIVATE_KEY for private sheets, or GOOGLE_API_KEY for public sheets"
     );
+  }
+}
+
+async function clearAndWriteSheetValues(
+  sheetId: string,
+  range: string,
+  values: string[][]
+): Promise<void> {
+  const accessToken = await getAccessTokenFromServiceAccount(SHEETS_SCOPE_RW);
+  const encodedRange = encodeURIComponent(range);
+  const base = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodedRange}`;
+  // Clear existing range
+  const clearRes = await fetch(`${base}:clear`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!clearRes.ok) {
+    const err = await clearRes.text();
+    throw new Error(`Failed clearing target range: ${err}`);
+  }
+  // Write values
+  const updateRes = await fetch(`${base}?valueInputOption=RAW`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ range, majorDimension: "ROWS", values }),
+  });
+  if (!updateRes.ok) {
+    const err = await updateRes.text();
+    throw new Error(`Failed updating target range: ${err}`);
   }
 }
 
@@ -323,6 +363,55 @@ Deno.serve(async (req) => {
       effectiveRange = rangeInput.trim();
     }
 
+    // Export paidparticipants to Google Sheets
+    if (action === "export_paid") {
+      // Load from DB
+      const { data, error } = await supabase
+        .from("paidparticipants")
+        .select("row_number, headers, data")
+        .order("row_number", { ascending: true });
+      if (error) throw error;
+      const list = (data || []) as Array<{
+        row_number: number;
+        headers: string[];
+        data: Record<string, any>;
+      }>;
+      const headers =
+        (list?.[0]?.headers as string[] | undefined) ?? ([] as string[]);
+      const headerRow = headers.length > 0 ? headers : [];
+      const valueRows: string[][] = list.map((r) =>
+        (headers.length > 0 ? headers : Object.keys(r.data || {})).map(
+          (h, i) => {
+            const key = h || `col_${i + 1}`;
+            const val = r.data?.[key];
+            return val == null ? "" : String(val);
+          }
+        )
+      );
+      const allValues =
+        headerRow.length > 0 ? [headerRow, ...valueRows] : valueRows;
+      // Determine write target: if rangeInput includes '!' use as-is; else write to first visible sheet starting at A1
+      let writeRange = "";
+      if (
+        !rangeInput ||
+        rangeInput.trim().length === 0 ||
+        !rangeInput.includes("!")
+      ) {
+        const firstTitle = await getFirstSheetTitle(sheetId);
+        writeRange = `${firstTitle}!A1`;
+      } else {
+        writeRange = rangeInput.trim();
+      }
+      await clearAndWriteSheetValues(sheetId, writeRange, allValues);
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          rowsExported: allValues.length - (headerRow.length > 0 ? 1 : 0),
+        }),
+        { headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
     const { headers, rows } = await fetchSheetValues(sheetId, effectiveRange);
 
     type Payload = {
@@ -367,29 +456,9 @@ Deno.serve(async (req) => {
         const chunk = upsertPayload.slice(i, i + CHUNK_SIZE);
         const { error } = await supabase
           .from("sheet_participants")
-          .upsert(chunk, { onConflict: "row_hash", ignoreDuplicates: true });
+          .upsert(chunk, { onConflict: "row_hash" });
         if (error) throw error;
         rowsUpserted += chunk.length;
-      }
-      // Remove rows that are no longer present in the source sheet to avoid duplicates across syncs
-      // (but keep duplicates that still exist in the sheet due to row_number being part of the hash)
-      const currentHashes = new Set(upsertPayload.map((p) => p.row_hash));
-      const { data: existing, error: listErr } = await supabase
-        .from("sheet_participants")
-        .select("row_hash");
-      if (listErr) throw listErr;
-      const toDelete = (existing || [])
-        .map((r: any) => (r as any).row_hash as string)
-        .filter((h: string) => !currentHashes.has(h));
-      if (toDelete.length > 0) {
-        for (let i = 0; i < toDelete.length; i += CHUNK_SIZE) {
-          const chunk = toDelete.slice(i, i + CHUNK_SIZE);
-          const { error: delErr } = await supabase
-            .from("sheet_participants")
-            .delete()
-            .in("row_hash", chunk);
-          if (delErr) throw delErr;
-        }
       }
     }
 
