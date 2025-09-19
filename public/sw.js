@@ -27,7 +27,6 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(request.url);
   const isSameOrigin = url.origin === self.location.origin;
-  const isJsOrCss = /\.(css|js)$/i.test(url.pathname) || url.pathname.startsWith("/assets/");
 
   // For navigations and HTML requests, use network-first to avoid stale blank pages
   const isNavigation =
@@ -52,33 +51,20 @@ self.addEventListener("fetch", (event) => {
   // Only cache same-origin assets; pass-through for cross-origin (e.g., Supabase)
   if (!isSameOrigin) return;
 
-  // Network-first for JS/CSS to avoid stale UI; cache-first for other assets
-  if (isJsOrCss) {
-    event.respondWith(
-      fetch(request)
+  // Cache-first for static assets; fill cache on first fetch
+  event.respondWith(
+    caches.match(request).then((cached) => {
+      if (cached) return cached;
+      return fetch(request)
         .then((response) => {
+          // Only cache successful, basic (opaque is fine for same-origin), and non-POST
           if (response && response.status === 200) {
             const copy = response.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
           }
           return response;
         })
-        .catch(() => caches.match(request))
-    );
-  } else {
-    event.respondWith(
-      caches.match(request).then((cached) => {
-        if (cached) return cached;
-        return fetch(request)
-          .then((response) => {
-            if (response && response.status === 200) {
-              const copy = response.clone();
-              caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
-            }
-            return response;
-          })
-          .catch(() => cached || Response.error());
-      })
-    );
-  }
+        .catch(() => cached || Response.error());
+    })
+  );
 });
