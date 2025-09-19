@@ -371,6 +371,26 @@ Deno.serve(async (req) => {
         if (error) throw error;
         rowsUpserted += chunk.length;
       }
+      // Remove rows that are no longer present in the source sheet to avoid duplicates across syncs
+      // (but keep duplicates that still exist in the sheet due to row_number being part of the hash)
+      const currentHashes = new Set(upsertPayload.map((p) => p.row_hash));
+      const { data: existing, error: listErr } = await supabase
+        .from("sheet_participants")
+        .select("row_hash");
+      if (listErr) throw listErr;
+      const toDelete = (existing || [])
+        .map((r: any) => (r as any).row_hash as string)
+        .filter((h: string) => !currentHashes.has(h));
+      if (toDelete.length > 0) {
+        for (let i = 0; i < toDelete.length; i += CHUNK_SIZE) {
+          const chunk = toDelete.slice(i, i + CHUNK_SIZE);
+          const { error: delErr } = await supabase
+            .from("sheet_participants")
+            .delete()
+            .in("row_hash", chunk);
+          if (delErr) throw delErr;
+        }
+      }
     }
 
     return new Response(
@@ -387,7 +407,10 @@ Deno.serve(async (req) => {
       JSON.stringify({ error: err?.message ?? String(err) }),
       {
         status: 500,
-        headers: { "Content-Type": "application/json", ...getCorsHeaders(req.headers.get("Origin")) },
+        headers: {
+          "Content-Type": "application/json",
+          ...getCorsHeaders(req.headers.get("Origin")),
+        },
       }
     );
   }

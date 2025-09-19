@@ -1030,6 +1030,28 @@ export default function App() {
     setHasMore((data ?? []).length === pageSize);
   }
 
+  function detectPrimaryEmail(
+    headers: string[] | null | undefined,
+    data: Record<string, any>
+  ): string {
+    const EMAIL_REGEX = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
+    const candidates = (headers || []).map((h) => String(h || ""));
+    const lower = candidates.map((h) => h.toLowerCase());
+    const patterns = ["email", "e-mail", "mail", "メール", "メールアドレス"];
+    for (let i = 0; i < candidates.length; i++) {
+      const h = lower[i];
+      if (patterns.some((p) => h.includes(p))) {
+        const key = candidates[i];
+        const val = data?.[key];
+        if (typeof val === "string" && EMAIL_REGEX.test(val)) return val.trim();
+      }
+    }
+    for (const v of Object.values(data || {})) {
+      if (typeof v === "string" && EMAIL_REGEX.test(v)) return v.trim();
+    }
+    return "";
+  }
+
   const filteredRows = useMemo(() => {
     if (!searchQuery) return rows;
     const query = searchQuery.toLowerCase();
@@ -1048,6 +1070,38 @@ export default function App() {
       return false;
     });
   }, [rows, tableHeaders, searchQuery]);
+
+  const dedupedRows = useMemo(() => {
+    const seen = new Set<string>();
+    const result: typeof filteredRows = [];
+    for (const r of filteredRows) {
+      const email = detectPrimaryEmail(tableHeaders, r.data).toLowerCase();
+      // Fallback to name-like keys if email is missing
+      let fallbackName = "";
+      const nameKeys = [
+        "代表者氏名",
+        "代表者",
+        "氏名",
+        "お名前",
+        "名前",
+        "name",
+        "申込者",
+      ];
+      for (const key of nameKeys) {
+        const v = r.data?.[key];
+        if (v) {
+          fallbackName = String(v).trim().toLowerCase();
+          if (fallbackName) break;
+        }
+      }
+      const dedupeKey = email || fallbackName || String(r.row_number);
+      if (!seen.has(dedupeKey)) {
+        seen.add(dedupeKey);
+        result.push(r);
+      }
+    }
+    return result;
+  }, [filteredRows, tableHeaders]);
 
   // Attempt to auto-detect adult/child header keys from current headers
   useEffect(() => {
@@ -1882,7 +1936,9 @@ export default function App() {
                   </div>
                 </div>
                 <div className="rounded-lg border bg-white p-4 shadow-sm card-hover">
-                  <div className="text-xs text-gray-500">登録済みこども人数</div>
+                  <div className="text-xs text-gray-500">
+                    登録済みこども人数
+                  </div>
                   <div className="mt-1 text-2xl font-semibold tracking-tight">
                     {childCount}
                   </div>
@@ -1894,13 +1950,17 @@ export default function App() {
                   </div>
                 </div>
                 <div className="rounded-lg border bg-white p-4 shadow-sm card-hover">
-                  <div className="text-xs text-gray-500">支払い済み大人人数</div>
+                  <div className="text-xs text-gray-500">
+                    支払い済み大人人数
+                  </div>
                   <div className="mt-1 text-2xl font-semibold tracking-tight">
                     {paidAdultCount}
                   </div>
                 </div>
                 <div className="rounded-lg border bg-white p-4 shadow-sm card-hover">
-                  <div className="text-xs text-gray-500">支払い済みこども人数</div>
+                  <div className="text-xs text-gray-500">
+                    支払い済みこども人数
+                  </div>
                   <div className="mt-1 text-2xl font-semibold tracking-tight">
                     {paidChildCount}
                   </div>
@@ -2126,7 +2186,7 @@ export default function App() {
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredRows.length === 0 ? (
+                        {dedupedRows.length === 0 ? (
                           <tr>
                             <td
                               colSpan={2 + tableHeaders.length}
@@ -2136,7 +2196,7 @@ export default function App() {
                             </td>
                           </tr>
                         ) : (
-                          filteredRows.map((r) => (
+                          dedupedRows.map((r) => (
                             <tr
                               key={r.row_hash || r.row_number}
                               className="odd:bg-white even:bg-gray-50"
