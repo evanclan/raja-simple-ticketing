@@ -3,3 +3,4 @@
     "jsr:@supabase/functions-js/edge-runtime.d.ts": "jsr:@supabase/functions-js@^2.4.3/edge-runtime.d.ts"
   }
 }
+
