@@ -1013,19 +1013,19 @@ export default function App() {
     const { data, error } = await supabase
       .from("sheet_participants")
       .select("row_number, row_hash, headers, data")
-      .order("row_number", { ascending: true })
+      .order("row_number", { ascending: false })
       .range(from, to);
     if (error) return; // silent; keep UI stable
     const headersFromFirst =
       (data?.[0]?.headers as string[] | undefined) ?? tableHeaders;
     setTableHeaders(headersFromFirst);
-    setRows(
-      (data ?? []).map((r: any) => ({
-        row_number: r.row_number,
-        row_hash: r.row_hash,
-        data: r.data as Record<string, any>,
-      }))
-    );
+    const mapped = (data ?? []).map((r: any) => ({
+      row_number: r.row_number,
+      row_hash: r.row_hash,
+      data: r.data as Record<string, any>,
+    }));
+    // Because we order by row_number desc for latest-first UI, reverse for display if needed
+    setRows(mapped);
     setPage(nextPage);
     setHasMore((data ?? []).length === pageSize);
   }
