@@ -1013,43 +1013,21 @@ export default function App() {
     const { data, error } = await supabase
       .from("sheet_participants")
       .select("row_number, row_hash, headers, data")
-      .order("row_number", { ascending: false })
+      .order("row_number", { ascending: true })
       .range(from, to);
     if (error) return; // silent; keep UI stable
     const headersFromFirst =
       (data?.[0]?.headers as string[] | undefined) ?? tableHeaders;
     setTableHeaders(headersFromFirst);
-    const mapped = (data ?? []).map((r: any) => ({
-      row_number: r.row_number,
-      row_hash: r.row_hash,
-      data: r.data as Record<string, any>,
-    }));
-    // Because we order by row_number desc for latest-first UI, reverse for display if needed
-    setRows(mapped);
+    setRows(
+      (data ?? []).map((r: any) => ({
+        row_number: r.row_number,
+        row_hash: r.row_hash,
+        data: r.data as Record<string, any>,
+      }))
+    );
     setPage(nextPage);
     setHasMore((data ?? []).length === pageSize);
-  }
-
-  function detectPrimaryEmail(
-    headers: string[] | null | undefined,
-    data: Record<string, any>
-  ): string {
-    const EMAIL_REGEX = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
-    const candidates = (headers || []).map((h) => String(h || ""));
-    const lower = candidates.map((h) => h.toLowerCase());
-    const patterns = ["email", "e-mail", "mail", "メール", "メールアドレス"];
-    for (let i = 0; i < candidates.length; i++) {
-      const h = lower[i];
-      if (patterns.some((p) => h.includes(p))) {
-        const key = candidates[i];
-        const val = data?.[key];
-        if (typeof val === "string" && EMAIL_REGEX.test(val)) return val.trim();
-      }
-    }
-    for (const v of Object.values(data || {})) {
-      if (typeof v === "string" && EMAIL_REGEX.test(v)) return v.trim();
-    }
-    return "";
   }
 
   const filteredRows = useMemo(() => {
@@ -1070,38 +1048,6 @@ export default function App() {
       return false;
     });
   }, [rows, tableHeaders, searchQuery]);
-
-  const dedupedRows = useMemo(() => {
-    const seen = new Set<string>();
-    const result: typeof filteredRows = [];
-    for (const r of filteredRows) {
-      const email = detectPrimaryEmail(tableHeaders, r.data).toLowerCase();
-      // Fallback to name-like keys if email is missing
-      let fallbackName = "";
-      const nameKeys = [
-        "代表者氏名",
-        "代表者",
-        "氏名",
-        "お名前",
-        "名前",
-        "name",
-        "申込者",
-      ];
-      for (const key of nameKeys) {
-        const v = r.data?.[key];
-        if (v) {
-          fallbackName = String(v).trim().toLowerCase();
-          if (fallbackName) break;
-        }
-      }
-      const dedupeKey = email || fallbackName || String(r.row_number);
-      if (!seen.has(dedupeKey)) {
-        seen.add(dedupeKey);
-        result.push(r);
-      }
-    }
-    return result;
-  }, [filteredRows, tableHeaders]);
 
   // Attempt to auto-detect adult/child header keys from current headers
   useEffect(() => {
@@ -1833,7 +1779,7 @@ export default function App() {
     <div className="min-h-screen bg-gray-50 text-gray-900">
       <header className="border-b border-red-100 bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60">
         <div className="mx-auto max-w-5xl px-4 pt-6 pb-4 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-2 sm:gap-3"></div>
             <h1 className="text-base sm:text-xl font-semibold text-indigo-700">
               RaJA Ticketing System
             </h1>
@@ -1936,9 +1882,7 @@ export default function App() {
                   </div>
                 </div>
                 <div className="rounded-lg border bg-white p-4 shadow-sm card-hover">
-                  <div className="text-xs text-gray-500">
-                    登録済みこども人数
-                  </div>
+                  <div className="text-xs text-gray-500">登録済みこども人数</div>
                   <div className="mt-1 text-2xl font-semibold tracking-tight">
                     {childCount}
                   </div>
@@ -1950,17 +1894,13 @@ export default function App() {
                   </div>
                 </div>
                 <div className="rounded-lg border bg-white p-4 shadow-sm card-hover">
-                  <div className="text-xs text-gray-500">
-                    支払い済み大人人数
-                  </div>
+                  <div className="text-xs text-gray-500">支払い済み大人人数</div>
                   <div className="mt-1 text-2xl font-semibold tracking-tight">
                     {paidAdultCount}
                   </div>
                 </div>
                 <div className="rounded-lg border bg-white p-4 shadow-sm card-hover">
-                  <div className="text-xs text-gray-500">
-                    支払い済みこども人数
-                  </div>
+                  <div className="text-xs text-gray-500">支払い済みこども人数</div>
                   <div className="mt-1 text-2xl font-semibold tracking-tight">
                     {paidChildCount}
                   </div>
@@ -2125,53 +2065,6 @@ export default function App() {
                   >
                     {isSyncing ? "Syncing…" : "Sync now"}
                   </button>
-                  <button
-                    onClick={async () => {
-                      if (!userToken) {
-                        alert("Please sign in first");
-                        return;
-                      }
-                      const normalizedId = extractSheetId(sheetId);
-                      setSheetId(normalizedId);
-                      try {
-                        setIsSyncing(true);
-                        setResultMessage("");
-                        const resp = await fetch(
-                          `${supabaseUrl}/functions/v1/sync_participants`,
-                          {
-                            method: "POST",
-                            headers: {
-                              "Content-Type": "application/json",
-                              Authorization: `Bearer ${userToken}`,
-                            },
-                            body: JSON.stringify({
-                              action: "export_paid",
-                              sheetId: normalizedId,
-                              range,
-                            }),
-                          }
-                        );
-                        if (!resp.ok) {
-                          const txt = await resp.text();
-                          throw new Error(`HTTP ${resp.status}: ${txt}`);
-                        }
-                        const data = await resp.json();
-                        setResultMessage(
-                          `OK: exported ${data?.rowsExported ?? 0} paid rows`
-                        );
-                      } catch (e: any) {
-                        setResultMessage(
-                          `Export failed: ${e?.message ?? String(e)}`
-                        );
-                      } finally {
-                        setIsSyncing(false);
-                      }
-                    }}
-                    disabled={isDisabled}
-                    className={`rounded bg-emerald-600 px-4 py-2 text-white hover:bg-emerald-700 disabled:opacity-50`}
-                  >
-                    Export paid to sheet
-                  </button>
                   {resultMessage && (
                     <span className="text-sm text-gray-700" role="status">
                       {resultMessage}
@@ -2233,7 +2126,7 @@ export default function App() {
                         </tr>
                       </thead>
                       <tbody>
-                        {dedupedRows.length === 0 ? (
+                        {filteredRows.length === 0 ? (
                           <tr>
                             <td
                               colSpan={2 + tableHeaders.length}
@@ -2243,7 +2136,7 @@ export default function App() {
                             </td>
                           </tr>
                         ) : (
-                          dedupedRows.map((r) => (
+                          filteredRows.map((r) => (
                             <tr
                               key={r.row_hash || r.row_number}
                               className="odd:bg-white even:bg-gray-50"
