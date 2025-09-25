@@ -450,6 +450,15 @@ Deno.serve(async (req) => {
         .neq("row_hash", "");
       if (clearPaidErr) throw clearPaidErr;
     }
+
+    // If sync_replace, only clear sheet_participants but preserve paid participants
+    if (action === "sync_replace") {
+      const { error: clearParticipantsErr } = await supabase
+        .from("sheet_participants")
+        .delete()
+        .neq("row_hash", "");
+      if (clearParticipantsErr) throw clearParticipantsErr;
+    }
     if (upsertPayload.length > 0) {
       const CHUNK_SIZE = 500;
       for (let i = 0; i < upsertPayload.length; i += CHUNK_SIZE) {

@@ -266,7 +266,7 @@ function CheckinsView() {
         <div className="text-gray-600">No check-ins yet.</div>
       ) : (
         <div className="table-scroll overflow-auto border rounded">
-          <table className="table-sticky min-w-full text-sm">
+          <table className="min-w-full text-sm">
             <thead className="bg-red-50/60 border-b border-red-100">
               <tr>
                 <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
@@ -981,7 +981,7 @@ export default function App() {
             Authorization: `Bearer ${userToken}`,
           },
           body: JSON.stringify({
-            action: "sync",
+            action: "sync_replace",
             sheetId: normalizedId,
             range,
           }),
@@ -1779,7 +1779,7 @@ export default function App() {
     <div className="min-h-screen bg-gray-50 text-gray-900">
       <header className="border-b border-red-100 bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60">
         <div className="mx-auto max-w-5xl px-4 pt-6 pb-4 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
-          <div className="flex items-center gap-2 sm:gap-3"></div>
+          <div className="flex items-center gap-2 sm:gap-3">
             <h1 className="text-base sm:text-xl font-semibold text-indigo-700">
               RaJA Ticketing System
             </h1>
@@ -1815,7 +1815,7 @@ export default function App() {
           </div>
         )}
         {!isCheckinsRoute && userEmail && (
-          <div className="rounded-lg border bg-white p-4 shadow-sm card-hover">
+          <div className="rounded-lg border bg-white p-4 shadow-sm">
             <div className="mb-2">
               <h2 className="text-xs font-medium text-gray-700">
                 システム状況
@@ -1854,7 +1854,7 @@ export default function App() {
             <p className="text-gray-600">読み込み中…</p>
           </div>
         ) : userEmail ? (
-          <div className="rounded-lg border bg-white p-6 shadow-sm card-hover">
+          <div className="rounded-lg border bg-white p-6 shadow-sm">
             {!isCheckinsRoute && (
               <div className="mb-4 flex items-center justify-between">
                 <h2 className="text-lg font-semibold">
@@ -1870,46 +1870,6 @@ export default function App() {
                   >
                     Sign out
                   </button>
-                </div>
-              </div>
-            )}
-            {!isCheckinsRoute && (
-              <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                <div className="rounded-lg border bg-white p-4 shadow-sm card-hover">
-                  <div className="text-xs text-gray-500">登録済み大人人数</div>
-                  <div className="mt-1 text-2xl font-semibold tracking-tight">
-                    {adultCount}
-                  </div>
-                </div>
-                <div className="rounded-lg border bg-white p-4 shadow-sm card-hover">
-                  <div className="text-xs text-gray-500">登録済みこども人数</div>
-                  <div className="mt-1 text-2xl font-semibold tracking-tight">
-                    {childCount}
-                  </div>
-                </div>
-                <div className="rounded-lg border bg-white p-4 shadow-sm card-hover">
-                  <div className="text-xs text-gray-500">見込合計（¥）</div>
-                  <div className="mt-1 text-2xl font-semibold tracking-tight">
-                    {estimatedTotal}
-                  </div>
-                </div>
-                <div className="rounded-lg border bg-white p-4 shadow-sm card-hover">
-                  <div className="text-xs text-gray-500">支払い済み大人人数</div>
-                  <div className="mt-1 text-2xl font-semibold tracking-tight">
-                    {paidAdultCount}
-                  </div>
-                </div>
-                <div className="rounded-lg border bg-white p-4 shadow-sm card-hover">
-                  <div className="text-xs text-gray-500">支払い済みこども人数</div>
-                  <div className="mt-1 text-2xl font-semibold tracking-tight">
-                    {paidChildCount}
-                  </div>
-                </div>
-                <div className="rounded-lg border bg-white p-4 shadow-sm card-hover">
-                  <div className="text-xs text-gray-500">支払い済み件数</div>
-                  <div className="mt-1 text-2xl font-semibold tracking-tight">
-                    {paidRows.length}
-                  </div>
                 </div>
               </div>
             )}
@@ -2106,7 +2066,7 @@ export default function App() {
                     </div>
                   </div>
                   <div className="table-scroll overflow-auto border rounded">
-                    <table className="table-sticky min-w-full text-sm">
+                    <table className="min-w-full text-sm">
                       <thead className="bg-red-50/60 border-b border-red-100">
                         <tr>
                           <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
@@ -2527,7 +2487,7 @@ export default function App() {
                               </div>
                             ) : (
                               <div className="table-scroll overflow-auto border rounded">
-                                <table className="table-sticky min-w-full text-sm">
+                                <table className="min-w-full text-sm">
                                   <thead className="bg-red-50/60 border-b border-red-100">
                                     <tr>
                                       <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
