@@ -1804,9 +1804,7 @@ export default function App() {
         <div className="mx-auto max-w-5xl px-4 pt-6 pb-4 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
           <div className="flex items-center gap-2 sm:gap-3">
             <h1 className="text-base sm:text-xl font-semibold text-indigo-700">
-              <a href="wwww.raja-ticketing-s.vercel.app">
-                RaJA Ticketing System
-              </a>
+              <a href="/">RaJA Ticketing System</a>
             </h1>
             <p className="text-xs sm:text-sm text-gray-900 opacity-60">
               Created and licensed by RaJA IT department
