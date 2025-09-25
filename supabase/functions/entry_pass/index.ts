@@ -3,11 +3,20 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { SignJWT, jwtVerify } from "https://esm.sh/jose@5.9.6";
 
+// Security constants
+const MAX_REQUEST_SIZE = 1024 * 10; // 10KB max request size
+const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
+const MAX_REQUESTS_PER_IP = 100; // per window
+const MAX_PIN_ATTEMPTS = 5; // reduced from 10
+const PIN_LOCKOUT_TIME = 15 * 60 * 1000; // 15 minutes
+const TOKEN_MAX_LENGTH = 2048; // JWT tokens shouldn't be longer than this
+const EMAIL_MAX_LENGTH = 254; // RFC 5321 limit
+const PIN_EXACT_LENGTH = 6; // Assuming 6-digit PIN
+
 type ActionRequest =
   | { action: "generate_link"; row_hash: string; baseUrl?: string }
   | { action: "resolve"; token: string }
   | { action: "check_in"; token: string; pin: string }
-  | { action: "test_db" }
   | {
       action: "send_email";
       row_hash: string;
@@ -20,6 +29,10 @@ type ActionRequest =
       from?: string;
     }
   | { action: "bulk_send"; baseUrl?: string; from?: string };
+
+// Rate limiting storage
+const rateLimitStore = new Map<string, { count: number; ts: number }>();
+const pinAttempts = new Map<string, { count: number; ts: number; lockedUntil?: number }>();
 
 function getCorsHeaders(origin: string | null): Record<string, string> {
   const base: Record<string, string> = {
@@ -50,6 +63,111 @@ function requiredEnv(name: string): string {
   return v;
 }
 
+// Security validation functions
+function validateToken(token: string): boolean {
+  if (!token || typeof token !== 'string') return false;
+  if (token.length > TOKEN_MAX_LENGTH) return false;
+  // JWT tokens have 3 parts separated by dots
+  const parts = token.split('.');
+  if (parts.length !== 3) return false;
+  // Each part should be base64url encoded (alphanumeric + - and _)
+  const base64urlPattern = /^[A-Za-z0-9_-]+$/;
+  return parts.every(part => base64urlPattern.test(part));
+}
+
+function validateEmail(email: string): boolean {
+  if (!email || typeof email !== 'string') return false;
+  if (email.length > EMAIL_MAX_LENGTH) return false;
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailPattern.test(email);
+}
+
+function validatePin(pin: string): boolean {
+  if (!pin || typeof pin !== 'string') return false;
+  if (pin.length !== PIN_EXACT_LENGTH) return false;
+  return /^\d+$/.test(pin); // Only digits
+}
+
+function validateRowHash(hash: string): boolean {
+  if (!hash || typeof hash !== 'string') return false;
+  if (hash.length < 10 || hash.length > 128) return false;
+  // Should be alphanumeric
+  return /^[A-Za-z0-9]+$/.test(hash);
+}
+
+function validateUrl(url: string): boolean {
+  if (!url || typeof url !== 'string') return false;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
+
+function sanitizeString(input: string, maxLength: number = 1000): string {
+  if (!input || typeof input !== 'string') return '';
+  return input.trim().slice(0, maxLength);
+}
+
+// Enhanced rate limiting
+function checkRateLimit(ip: string, action: string): boolean {
+  const key = `${ip}:${action}`;
+  const now = Date.now();
+  const entry = rateLimitStore.get(key);
+  
+  if (!entry || now - entry.ts > RATE_LIMIT_WINDOW) {
+    rateLimitStore.set(key, { count: 1, ts: now });
+    return true;
+  }
+  
+  if (entry.count >= MAX_REQUESTS_PER_IP) {
+    return false;
+  }
+  
+  entry.count += 1;
+  return true;
+}
+
+// Enhanced PIN rate limiting with lockout
+function checkPinRateLimit(key: string): { allowed: boolean; lockedUntil?: number } {
+  const now = Date.now();
+  const entry = pinAttempts.get(key);
+  
+  // Check if locked out
+  if (entry?.lockedUntil && now < entry.lockedUntil) {
+    return { allowed: false, lockedUntil: entry.lockedUntil };
+  }
+  
+  // Reset if window expired
+  if (!entry || now - entry.ts > RATE_LIMIT_WINDOW) {
+    pinAttempts.set(key, { count: 1, ts: now });
+    return { allowed: true };
+  }
+  
+  // Check if exceeded attempts
+  if (entry.count >= MAX_PIN_ATTEMPTS) {
+    const lockedUntil = now + PIN_LOCKOUT_TIME;
+    pinAttempts.set(key, { ...entry, lockedUntil });
+    return { allowed: false, lockedUntil };
+  }
+  
+  entry.count += 1;
+  return { allowed: true };
+}
+
+// Secure logging (remove sensitive data)
+function secureLog(message: string, data?: any) {
+  const isProduction = Deno.env.get("DENO_DEPLOYMENT_ID"); // Deno Deploy sets this
+  if (isProduction) {
+    // In production, only log essential info without sensitive data
+    console.log(message);
+  } else {
+    // In development, log more details
+    console.log(message, data);
+  }
+}
+
 function getSupabaseServiceClient() {
   const url = requiredEnv("SUPABASE_URL");
   const serviceKey =
@@ -58,8 +176,7 @@ function getSupabaseServiceClient() {
     "";
   if (!serviceKey) throw new Error("Missing service role key");
 
-  console.log("Creating Supabase client with URL:", url);
-  console.log("Service key available:", serviceKey ? "Yes" : "No");
+  secureLog("Creating Supabase client");
 
   // Create client with service role key - this should bypass RLS
   const client = createClient(url, serviceKey, {
@@ -72,7 +189,7 @@ function getSupabaseServiceClient() {
     },
   });
 
-  console.log("Client created with service key");
+  secureLog("Supabase client created successfully");
 
   return client;
 }
@@ -231,26 +348,16 @@ async function sendViaResend(params: {
   return await res.json();
 }
 
-// naive in-memory rate limiter for PIN attempts (per token+ip)
-const pinAttempts = new Map<string, { count: number; ts: number }>();
-function rateLimitPin(key: string, limit = 10, windowMs = 60_000): boolean {
-  const now = Date.now();
-  const entry = pinAttempts.get(key);
-  if (!entry || now - entry.ts > windowMs) {
-    pinAttempts.set(key, { count: 1, ts: now });
-    return true;
-  }
-  if (entry.count >= limit) return false;
-  entry.count += 1;
-  return true;
-}
+// Legacy function - removed in favor of enhanced checkPinRateLimit
 
 Deno.serve(async (req) => {
   const origin = req.headers.get("Origin");
   const corsHeaders = getCorsHeaders(origin);
+  
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+  
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
@@ -258,26 +365,71 @@ Deno.serve(async (req) => {
     });
   }
 
+  // Security: Check request size
+  const contentLength = req.headers.get("content-length");
+  if (contentLength && parseInt(contentLength) > MAX_REQUEST_SIZE) {
+    return new Response(JSON.stringify({ error: "Request too large" }), {
+      status: 413,
+      headers: { "Content-Type": "application/json", ...corsHeaders },
+    });
+  }
+
+  // Rate limiting
+  const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown";
+  const userAgent = req.headers.get("user-agent") || "";
+  
+  // Basic bot detection
+  if (userAgent.includes("bot") || userAgent.includes("crawler") || userAgent.includes("spider")) {
+    return new Response(JSON.stringify({ error: "Access denied" }), {
+      status: 403,
+      headers: { "Content-Type": "application/json", ...corsHeaders },
+    });
+  }
+
   try {
     const body = (await req.json()) as ActionRequest;
     
+    // Validate action exists and is allowed
+    const allowedActions = ["generate_link", "resolve", "check_in", "send_email", "bulk_send"];
+    if (!body.action || !allowedActions.includes(body.action)) {
+      return new Response(JSON.stringify({ error: "Invalid action" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
+
+    // Check rate limiting for this IP and action
+    if (!checkRateLimit(ip, body.action)) {
+      secureLog(`Rate limit exceeded for IP: ${ip.slice(0, 8)}...`);
+      return new Response(JSON.stringify({ error: "Too many requests" }), {
+        status: 429,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
+    
     // Check if this is a public action that doesn't require authentication
-    const publicActions = ["resolve", "test_db"];
+    const publicActions = ["resolve"];
     const isPublicAction = publicActions.includes(body.action);
     
-    console.log(`Action: ${body.action}, IsPublic: ${isPublicAction}`);
+    secureLog(`Processing action: ${body.action}`);
     
     // For public actions, we still need to use the service client but don't require user auth
     const supabase = getSupabaseServiceClient();
 
     if (body.action === "generate_link") {
       await requireAdmin(req);
-      const baseUrl =
-        body.baseUrl?.trim() || Deno.env.get("PUBLIC_APP_URL") || "";
-      if (!baseUrl) throw new Error("Missing baseUrl (set PUBLIC_APP_URL)");
+      
+      // Input validation
+      const baseUrl = body.baseUrl?.trim() || Deno.env.get("PUBLIC_APP_URL") || "";
+      if (!baseUrl) throw new Error("Missing baseUrl");
+      if (!validateUrl(baseUrl)) throw new Error("Invalid baseUrl format");
       if (!body.row_hash) throw new Error("row_hash is required");
+      if (!validateRowHash(body.row_hash)) throw new Error("Invalid row_hash format");
+      
       const token = await signToken({ rh: body.row_hash });
       const url = `${baseUrl.replace(/\/$/, "")}/pass/${token}`;
+      
+      secureLog("Entry pass link generated successfully");
       return new Response(JSON.stringify({ ok: true, url, token }), {
         headers: { "Content-Type": "application/json", ...corsHeaders },
       });
@@ -285,16 +437,17 @@ Deno.serve(async (req) => {
 
     if (body.action === "resolve") {
       try {
-        console.log("Starting resolve action...");
-        console.log("Token received:", body.token ? "Yes" : "No");
+        // Input validation
+        if (!body.token) throw new Error("Token is required");
+        if (!validateToken(body.token)) throw new Error("Invalid token format");
 
         const { rh } = await verifyToken(body.token);
-        if (!rh || typeof rh !== "string") throw new Error("Invalid token");
+        if (!rh || typeof rh !== "string") throw new Error("Invalid token payload");
+        if (!validateRowHash(rh)) throw new Error("Invalid row hash in token");
 
-        console.log("Resolving entry pass for hash:", rh);
+        secureLog("Resolving entry pass");
 
         // Try using Supabase client directly - it should use service role key
-        console.log("Using Supabase client with service role...");
         const { data, error } = await supabase
           .from("paidparticipants")
           .select("row_number, headers, data")
@@ -302,17 +455,11 @@ Deno.serve(async (req) => {
           .single();
 
         if (error) {
-          console.error("Supabase client error:", error);
-          console.error("Error code:", error.code);
-          console.error("Error message:", error.message);
-          console.error("Error details:", error.details);
-          console.error("Error hint:", error.hint);
-          throw new Error(
-            `Database error: ${error.message} (Code: ${error.code})`
-          );
+          secureLog(`Database error: ${error.code}`, { message: error.message });
+          throw new Error("Failed to retrieve entry pass data");
         }
 
-        console.log("Participant data fetched successfully");
+        secureLog("Participant data retrieved successfully");
 
         const { data: checkin, error: cErr } = await supabase
           .from("checkins")
@@ -321,7 +468,7 @@ Deno.serve(async (req) => {
           .maybeSingle();
 
         if (cErr) {
-          console.warn("Checkin fetch error:", cErr.message);
+          secureLog("Checkin fetch warning", { code: cErr.code });
         }
 
         return new Response(
@@ -329,108 +476,76 @@ Deno.serve(async (req) => {
           { headers: { "Content-Type": "application/json", ...corsHeaders } }
         );
       } catch (error) {
-        console.error("Error in resolve action:", error);
+        secureLog("Error in resolve action", { error: error.message });
         throw error;
       }
     }
 
-    if (body.action === "test_db") {
-      try {
-        console.log("Testing database connection with service role...");
-
-        // Test 1: Try to query paidparticipants table
-        const {
-          data: testData,
-          error: testError,
-          count,
-        } = await supabase
-          .from("paidparticipants")
-          .select("row_hash", { count: "exact" })
-          .limit(1);
-
-        if (testError) {
-          console.error("Test query failed:", testError);
-          return new Response(
-            JSON.stringify({
-              ok: false,
-              error: "Database test failed",
-              details: testError,
-              service_key_length: (
-                Deno.env.get("SERVICE_ROLE_KEY") ||
-                Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ||
-                ""
-              ).length,
-            }),
-            {
-              status: 200,
-              headers: { "Content-Type": "application/json", ...corsHeaders },
-            }
-          );
-        }
-
-        return new Response(
-          JSON.stringify({
-            ok: true,
-            message: "Database connection successful",
-            count: count,
-            has_data: testData && testData.length > 0,
-            service_key_length: (
-              Deno.env.get("SERVICE_ROLE_KEY") ||
-              Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ||
-              ""
-            ).length,
-          }),
-          { headers: { "Content-Type": "application/json", ...corsHeaders } }
-        );
-      } catch (error) {
-        console.error("Test action error:", error);
-        return new Response(
-          JSON.stringify({
-            ok: false,
-            error: "Test failed with exception",
-            message: error.message,
-            service_key_length: (
-              Deno.env.get("SERVICE_ROLE_KEY") ||
-              Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ||
-              ""
-            ).length,
-          }),
-          {
-            status: 200,
-            headers: { "Content-Type": "application/json", ...corsHeaders },
-          }
-        );
-      }
-    }
 
     if (body.action === "check_in") {
-      const ip = req.headers.get("x-forwarded-for") || "unknown";
-      const key = `${ip}:${(body.token || "").slice(0, 16)}`;
-      if (!rateLimitPin(key)) {
+      // Input validation
+      if (!body.token) throw new Error("Token is required");
+      if (!validateToken(body.token)) throw new Error("Invalid token format");
+      if (!body.pin) throw new Error("PIN is required");
+      if (!validatePin(body.pin)) throw new Error("Invalid PIN format");
+
+      // Enhanced rate limiting for PIN attempts
+      const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown";
+      const key = `${ip}:${body.token.slice(0, 16)}`;
+      const rateLimitResult = checkPinRateLimit(key);
+      
+      if (!rateLimitResult.allowed) {
+        const errorMessage = rateLimitResult.lockedUntil 
+          ? "Account temporarily locked due to too many failed attempts"
+          : "Too many attempts";
+        
+        secureLog(`PIN rate limit exceeded for IP: ${ip.slice(0, 8)}...`);
         return new Response(
-          JSON.stringify({ ok: false, error: "Too many attempts" }),
+          JSON.stringify({ 
+            ok: false, 
+            error: errorMessage,
+            lockedUntil: rateLimitResult.lockedUntil
+          }),
           {
             status: 429,
             headers: { "Content-Type": "application/json", ...corsHeaders },
           }
         );
       }
-      const pin = (body.pin || "").trim();
+
+      // Verify PIN
+      const pin = body.pin.trim();
       const expected = requiredEnv("ENTRY_ADMIN_PIN");
-      if (!pin || pin !== expected) {
-        return new Response(JSON.stringify({ ok: false, error: "Forbidden" }), {
+      if (pin !== expected) {
+        secureLog(`Invalid PIN attempt from IP: ${ip.slice(0, 8)}...`);
+        return new Response(JSON.stringify({ ok: false, error: "Invalid PIN" }), {
           status: 403,
           headers: { "Content-Type": "application/json", ...corsHeaders },
         });
       }
+
+      // Verify token and extract row hash
       const { rh } = await verifyToken(body.token);
-      if (!rh || typeof rh !== "string") throw new Error("Invalid token");
+      if (!rh || typeof rh !== "string") throw new Error("Invalid token payload");
+      if (!validateRowHash(rh)) throw new Error("Invalid row hash in token");
+
+      // Perform check-in
       const { error } = await supabase
         .from("checkins")
-        .upsert([{ row_hash: rh, checked_in_at: new Date().toISOString() }], {
+        .upsert([{ 
+          row_hash: rh, 
+          checked_in_at: new Date().toISOString(),
+          checked_in_by: ip.slice(0, 12) // Store partial IP for audit
+        }], {
           onConflict: "row_hash",
         });
-      if (error) throw error;
+      
+      if (error) {
+        secureLog("Check-in database error", { code: error.code });
+        throw new Error("Failed to record check-in");
+      }
+
+      secureLog("Check-in successful");
       return new Response(JSON.stringify({ ok: true }), {
         headers: { "Content-Type": "application/json", ...corsHeaders },
       });
@@ -556,15 +671,31 @@ Deno.serve(async (req) => {
       headers: { "Content-Type": "application/json", ...corsHeaders },
     });
   } catch (err: any) {
-    console.error("Function error:", err);
-    console.error("Error stack:", err?.stack);
+    secureLog("Function error", { error: err?.message, stack: err?.stack?.split('\n')[0] });
+    
+    // Don't expose internal errors in production
+    const isProduction = Deno.env.get("DENO_DEPLOYMENT_ID");
+    const errorMessage = isProduction 
+      ? "An internal error occurred" 
+      : err?.message ?? "Unknown error";
+    
+    // Determine appropriate status code
+    let status = 400;
+    if (err?.message?.includes("Unauthorized") || err?.message?.includes("Forbidden")) {
+      status = 403;
+    } else if (err?.message?.includes("Not found")) {
+      status = 404;
+    } else if (err?.message?.includes("Too many")) {
+      status = 429;
+    }
+    
     return new Response(
       JSON.stringify({
-        error: err?.message ?? String(err),
-        details: err?.stack ? err.stack.split("\n").slice(0, 5) : undefined,
+        error: errorMessage,
+        timestamp: new Date().toISOString(),
       }),
       {
-        status: 400,
+        status,
         headers: {
           "Content-Type": "application/json",
           ...getCorsHeaders(req.headers.get("Origin")),
