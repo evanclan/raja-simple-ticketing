@@ -136,6 +136,11 @@ async function fetchSheetValues(
   }
   const headers = (values[0] ?? []).map((h: string) => (h ?? "").trim());
   const rows = values.slice(1);
+  
+  // Debug log to check what headers we're getting
+  console.log("Debug - Raw first row:", values[0]);
+  console.log("Debug - Processed headers:", headers);
+  
   return { headers, rows };
 }
 

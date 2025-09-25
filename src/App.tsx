@@ -887,10 +887,12 @@ export default function App() {
       }
     })();
 
-    const sub = supabase.auth.onAuthStateChange(async (_event: any, session: any) => {
-      setUserEmail(session?.user?.email ?? null);
-      setUserToken(session?.access_token ?? null);
-    });
+    const sub = supabase.auth.onAuthStateChange(
+      async (_event: any, session: any) => {
+        setUserEmail(session?.user?.email ?? null);
+        setUserToken(session?.access_token ?? null);
+      }
+    );
     // Align with current supabase-js v2 API
     // sub.data.subscription.unsubscribe() in examples; keep safe access:
     unsub = sub?.data?.subscription ?? (sub as any)?.subscription ?? null;
@@ -1018,6 +1020,11 @@ export default function App() {
     if (error) return; // silent; keep UI stable
     const headersFromFirst =
       (data?.[0]?.headers as string[] | undefined) ?? tableHeaders;
+    
+    // Debug log to check what headers we're getting from DB
+    console.log("Debug - Headers from DB:", data?.[0]?.headers);
+    console.log("Debug - Final headers:", headersFromFirst);
+    
     setTableHeaders(headersFromFirst);
     setRows(
       (data ?? []).map((r: any) => ({
