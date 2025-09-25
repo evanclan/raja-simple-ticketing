@@ -134,12 +134,40 @@ async function fetchSheetValues(
   if (values.length === 0) {
     return { headers: [], rows: [] };
   }
-  const headers = (values[0] ?? []).map((h: string) => (h ?? "").trim());
-  const rows = values.slice(1);
   
-  // Debug log to check what headers we're getting
-  console.log("Debug - Raw first row:", values[0]);
-  console.log("Debug - Processed headers:", headers);
+  // Find the first non-empty row to use as headers
+  let headerRowIndex = 0;
+  let headers: string[] = [];
+  
+  for (let i = 0; i < Math.min(values.length, 5); i++) { // Check first 5 rows max
+    const row = values[i] ?? [];
+    const processedRow = row.map((h: string) => (h ?? "").trim());
+    const nonEmptyCount = processedRow.filter(h => h).length;
+    
+    console.log(`Debug - Row ${i}:`, row);
+    console.log(`Debug - Processed row ${i}:`, processedRow);
+    console.log(`Debug - Non-empty count in row ${i}:`, nonEmptyCount);
+    
+    if (nonEmptyCount > 0) {
+      headers = processedRow;
+      headerRowIndex = i;
+      console.log(`Debug - Using row ${i} as headers:`, headers);
+      break;
+    }
+  }
+  
+  // If still no valid headers found, generate column names based on the first row length
+  if (headers.filter(h => h).length === 0 && values[0]) {
+    console.log("Debug - No valid headers found, generating column names");
+    const firstRowLength = values[0].length;
+    headers = Array.from({length: firstRowLength}, (_, i) => `Column ${i + 1}`);
+    headerRowIndex = 0;
+  }
+  
+  const rows = values.slice(headerRowIndex + 1);
+  console.log("Debug - Final headers:", headers);
+  console.log("Debug - Using header row index:", headerRowIndex);
+  console.log("Debug - Data rows count:", rows.length);
   
   return { headers, rows };
 }
