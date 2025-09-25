@@ -11,7 +11,8 @@ const MAX_PIN_ATTEMPTS = 5; // reduced from 10
 const PIN_LOCKOUT_TIME = 15 * 60 * 1000; // 15 minutes
 const TOKEN_MAX_LENGTH = 2048; // JWT tokens shouldn't be longer than this
 const EMAIL_MAX_LENGTH = 254; // RFC 5321 limit
-const PIN_EXACT_LENGTH = 6; // Assuming 6-digit PIN
+const MIN_PIN_LENGTH = 4; // Minimum PIN length
+const MAX_PIN_LENGTH = 12; // Maximum PIN length
 
 type ActionRequest =
   | { action: "generate_link"; row_hash: string; baseUrl?: string }
@@ -32,7 +33,10 @@ type ActionRequest =
 
 // Rate limiting storage
 const rateLimitStore = new Map<string, { count: number; ts: number }>();
-const pinAttempts = new Map<string, { count: number; ts: number; lockedUntil?: number }>();
+const pinAttempts = new Map<
+  string,
+  { count: number; ts: number; lockedUntil?: number }
+>();
 
 function getCorsHeaders(origin: string | null): Record<string, string> {
   const base: Record<string, string> = {
@@ -65,48 +69,48 @@ function requiredEnv(name: string): string {
 
 // Security validation functions
 function validateToken(token: string): boolean {
-  if (!token || typeof token !== 'string') return false;
+  if (!token || typeof token !== "string") return false;
   if (token.length > TOKEN_MAX_LENGTH) return false;
   // JWT tokens have 3 parts separated by dots
-  const parts = token.split('.');
+  const parts = token.split(".");
   if (parts.length !== 3) return false;
   // Each part should be base64url encoded (alphanumeric + - and _)
   const base64urlPattern = /^[A-Za-z0-9_-]+$/;
-  return parts.every(part => base64urlPattern.test(part));
+  return parts.every((part) => base64urlPattern.test(part));
 }
 
 function validateEmail(email: string): boolean {
-  if (!email || typeof email !== 'string') return false;
+  if (!email || typeof email !== "string") return false;
   if (email.length > EMAIL_MAX_LENGTH) return false;
   const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailPattern.test(email);
 }
 
 function validatePin(pin: string): boolean {
-  if (!pin || typeof pin !== 'string') return false;
-  if (pin.length !== PIN_EXACT_LENGTH) return false;
+  if (!pin || typeof pin !== "string") return false;
+  if (pin.length < MIN_PIN_LENGTH || pin.length > MAX_PIN_LENGTH) return false;
   return /^\d+$/.test(pin); // Only digits
 }
 
 function validateRowHash(hash: string): boolean {
-  if (!hash || typeof hash !== 'string') return false;
+  if (!hash || typeof hash !== "string") return false;
   if (hash.length < 10 || hash.length > 128) return false;
   // Should be alphanumeric
   return /^[A-Za-z0-9]+$/.test(hash);
 }
 
 function validateUrl(url: string): boolean {
-  if (!url || typeof url !== 'string') return false;
+  if (!url || typeof url !== "string") return false;
   try {
     const parsed = new URL(url);
-    return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+    return parsed.protocol === "https:" || parsed.protocol === "http:";
   } catch {
     return false;
   }
 }
 
 function sanitizeString(input: string, maxLength: number = 1000): string {
-  if (!input || typeof input !== 'string') return '';
+  if (!input || typeof input !== "string") return "";
   return input.trim().slice(0, maxLength);
 }
 
@@ -115,43 +119,46 @@ function checkRateLimit(ip: string, action: string): boolean {
   const key = `${ip}:${action}`;
   const now = Date.now();
   const entry = rateLimitStore.get(key);
-  
+
   if (!entry || now - entry.ts > RATE_LIMIT_WINDOW) {
     rateLimitStore.set(key, { count: 1, ts: now });
     return true;
   }
-  
+
   if (entry.count >= MAX_REQUESTS_PER_IP) {
     return false;
   }
-  
+
   entry.count += 1;
   return true;
 }
 
 // Enhanced PIN rate limiting with lockout
-function checkPinRateLimit(key: string): { allowed: boolean; lockedUntil?: number } {
+function checkPinRateLimit(key: string): {
+  allowed: boolean;
+  lockedUntil?: number;
+} {
   const now = Date.now();
   const entry = pinAttempts.get(key);
-  
+
   // Check if locked out
   if (entry?.lockedUntil && now < entry.lockedUntil) {
     return { allowed: false, lockedUntil: entry.lockedUntil };
   }
-  
+
   // Reset if window expired
   if (!entry || now - entry.ts > RATE_LIMIT_WINDOW) {
     pinAttempts.set(key, { count: 1, ts: now });
     return { allowed: true };
   }
-  
+
   // Check if exceeded attempts
   if (entry.count >= MAX_PIN_ATTEMPTS) {
     const lockedUntil = now + PIN_LOCKOUT_TIME;
     pinAttempts.set(key, { ...entry, lockedUntil });
     return { allowed: false, lockedUntil };
   }
-  
+
   entry.count += 1;
   return { allowed: true };
 }
@@ -353,11 +360,11 @@ async function sendViaResend(params: {
 Deno.serve(async (req) => {
   const origin = req.headers.get("Origin");
   const corsHeaders = getCorsHeaders(origin);
-  
+
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
-  
+
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
@@ -375,11 +382,18 @@ Deno.serve(async (req) => {
   }
 
   // Rate limiting
-  const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown";
+  const ip =
+    req.headers.get("x-forwarded-for") ||
+    req.headers.get("x-real-ip") ||
+    "unknown";
   const userAgent = req.headers.get("user-agent") || "";
-  
+
   // Basic bot detection
-  if (userAgent.includes("bot") || userAgent.includes("crawler") || userAgent.includes("spider")) {
+  if (
+    userAgent.includes("bot") ||
+    userAgent.includes("crawler") ||
+    userAgent.includes("spider")
+  ) {
     return new Response(JSON.stringify({ error: "Access denied" }), {
       status: 403,
       headers: { "Content-Type": "application/json", ...corsHeaders },
@@ -388,9 +402,15 @@ Deno.serve(async (req) => {
 
   try {
     const body = (await req.json()) as ActionRequest;
-    
+
     // Validate action exists and is allowed
-    const allowedActions = ["generate_link", "resolve", "check_in", "send_email", "bulk_send"];
+    const allowedActions = [
+      "generate_link",
+      "resolve",
+      "check_in",
+      "send_email",
+      "bulk_send",
+    ];
     if (!body.action || !allowedActions.includes(body.action)) {
       return new Response(JSON.stringify({ error: "Invalid action" }), {
         status: 400,
@@ -406,29 +426,31 @@ Deno.serve(async (req) => {
         headers: { "Content-Type": "application/json", ...corsHeaders },
       });
     }
-    
+
     // Check if this is a public action that doesn't require authentication
     const publicActions = ["resolve"];
     const isPublicAction = publicActions.includes(body.action);
-    
+
     secureLog(`Processing action: ${body.action}`);
-    
+
     // For public actions, we still need to use the service client but don't require user auth
     const supabase = getSupabaseServiceClient();
 
     if (body.action === "generate_link") {
       await requireAdmin(req);
-      
+
       // Input validation
-      const baseUrl = body.baseUrl?.trim() || Deno.env.get("PUBLIC_APP_URL") || "";
+      const baseUrl =
+        body.baseUrl?.trim() || Deno.env.get("PUBLIC_APP_URL") || "";
       if (!baseUrl) throw new Error("Missing baseUrl");
       if (!validateUrl(baseUrl)) throw new Error("Invalid baseUrl format");
       if (!body.row_hash) throw new Error("row_hash is required");
-      if (!validateRowHash(body.row_hash)) throw new Error("Invalid row_hash format");
-      
+      if (!validateRowHash(body.row_hash))
+        throw new Error("Invalid row_hash format");
+
       const token = await signToken({ rh: body.row_hash });
       const url = `${baseUrl.replace(/\/$/, "")}/pass/${token}`;
-      
+
       secureLog("Entry pass link generated successfully");
       return new Response(JSON.stringify({ ok: true, url, token }), {
         headers: { "Content-Type": "application/json", ...corsHeaders },
@@ -442,7 +464,8 @@ Deno.serve(async (req) => {
         if (!validateToken(body.token)) throw new Error("Invalid token format");
 
         const { rh } = await verifyToken(body.token);
-        if (!rh || typeof rh !== "string") throw new Error("Invalid token payload");
+        if (!rh || typeof rh !== "string")
+          throw new Error("Invalid token payload");
         if (!validateRowHash(rh)) throw new Error("Invalid row hash in token");
 
         secureLog("Resolving entry pass");
@@ -455,7 +478,9 @@ Deno.serve(async (req) => {
           .single();
 
         if (error) {
-          secureLog(`Database error: ${error.code}`, { message: error.message });
+          secureLog(`Database error: ${error.code}`, {
+            message: error.message,
+          });
           throw new Error("Failed to retrieve entry pass data");
         }
 
@@ -481,30 +506,39 @@ Deno.serve(async (req) => {
       }
     }
 
-
     if (body.action === "check_in") {
       // Input validation
       if (!body.token) throw new Error("Token is required");
       if (!validateToken(body.token)) throw new Error("Invalid token format");
       if (!body.pin) throw new Error("PIN is required");
-      if (!validatePin(body.pin)) throw new Error("Invalid PIN format");
+      if (!validatePin(body.pin)) {
+        secureLog(
+          `PIN validation failed - length: ${
+            body.pin.length
+          }, content type: ${typeof body.pin}`
+        );
+        throw new Error("Invalid PIN format");
+      }
 
       // Enhanced rate limiting for PIN attempts
-      const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown";
+      const ip =
+        req.headers.get("x-forwarded-for") ||
+        req.headers.get("x-real-ip") ||
+        "unknown";
       const key = `${ip}:${body.token.slice(0, 16)}`;
       const rateLimitResult = checkPinRateLimit(key);
-      
+
       if (!rateLimitResult.allowed) {
-        const errorMessage = rateLimitResult.lockedUntil 
+        const errorMessage = rateLimitResult.lockedUntil
           ? "Account temporarily locked due to too many failed attempts"
           : "Too many attempts";
-        
+
         secureLog(`PIN rate limit exceeded for IP: ${ip.slice(0, 8)}...`);
         return new Response(
-          JSON.stringify({ 
-            ok: false, 
+          JSON.stringify({
+            ok: false,
             error: errorMessage,
-            lockedUntil: rateLimitResult.lockedUntil
+            lockedUntil: rateLimitResult.lockedUntil,
           }),
           {
             status: 429,
@@ -518,28 +552,35 @@ Deno.serve(async (req) => {
       const expected = requiredEnv("ENTRY_ADMIN_PIN");
       if (pin !== expected) {
         secureLog(`Invalid PIN attempt from IP: ${ip.slice(0, 8)}...`);
-        return new Response(JSON.stringify({ ok: false, error: "Invalid PIN" }), {
-          status: 403,
-          headers: { "Content-Type": "application/json", ...corsHeaders },
-        });
+        return new Response(
+          JSON.stringify({ ok: false, error: "Invalid PIN" }),
+          {
+            status: 403,
+            headers: { "Content-Type": "application/json", ...corsHeaders },
+          }
+        );
       }
 
       // Verify token and extract row hash
       const { rh } = await verifyToken(body.token);
-      if (!rh || typeof rh !== "string") throw new Error("Invalid token payload");
+      if (!rh || typeof rh !== "string")
+        throw new Error("Invalid token payload");
       if (!validateRowHash(rh)) throw new Error("Invalid row hash in token");
 
       // Perform check-in
-      const { error } = await supabase
-        .from("checkins")
-        .upsert([{ 
-          row_hash: rh, 
-          checked_in_at: new Date().toISOString(),
-          checked_in_by: ip.slice(0, 12) // Store partial IP for audit
-        }], {
+      const { error } = await supabase.from("checkins").upsert(
+        [
+          {
+            row_hash: rh,
+            checked_in_at: new Date().toISOString(),
+            checked_in_by: ip.slice(0, 12), // Store partial IP for audit
+          },
+        ],
+        {
           onConflict: "row_hash",
-        });
-      
+        }
+      );
+
       if (error) {
         secureLog("Check-in database error", { code: error.code });
         throw new Error("Failed to record check-in");
@@ -671,24 +712,30 @@ Deno.serve(async (req) => {
       headers: { "Content-Type": "application/json", ...corsHeaders },
     });
   } catch (err: any) {
-    secureLog("Function error", { error: err?.message, stack: err?.stack?.split('\n')[0] });
-    
+    secureLog("Function error", {
+      error: err?.message,
+      stack: err?.stack?.split("\n")[0],
+    });
+
     // Don't expose internal errors in production
     const isProduction = Deno.env.get("DENO_DEPLOYMENT_ID");
     const errorMessage = isProduction 
       ? "An internal error occurred" 
       : err?.message ?? "Unknown error";
-    
+
     // Determine appropriate status code
     let status = 400;
-    if (err?.message?.includes("Unauthorized") || err?.message?.includes("Forbidden")) {
+    if (
+      err?.message?.includes("Unauthorized") ||
+      err?.message?.includes("Forbidden")
+    ) {
       status = 403;
     } else if (err?.message?.includes("Not found")) {
       status = 404;
     } else if (err?.message?.includes("Too many")) {
       status = 429;
     }
-    
+
     return new Response(
       JSON.stringify({
         error: errorMessage,
