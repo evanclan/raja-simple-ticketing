@@ -134,41 +134,64 @@ async function fetchSheetValues(
   if (values.length === 0) {
     return { headers: [], rows: [] };
   }
-  
+
   // Find the first non-empty row to use as headers
   let headerRowIndex = 0;
   let headers: string[] = [];
-  
-  for (let i = 0; i < Math.min(values.length, 5); i++) { // Check first 5 rows max
+
+  for (let i = 0; i < Math.min(values.length, 5); i++) {
+    // Check first 5 rows max
     const row = values[i] ?? [];
     const processedRow = row.map((h: string) => (h ?? "").trim());
-    const nonEmptyCount = processedRow.filter(h => h).length;
-    
+    const nonEmptyCount = processedRow.filter((h) => h).length;
+
     console.log(`Debug - Row ${i}:`, row);
     console.log(`Debug - Processed row ${i}:`, processedRow);
     console.log(`Debug - Non-empty count in row ${i}:`, nonEmptyCount);
-    
+
     if (nonEmptyCount > 0) {
       headers = processedRow;
       headerRowIndex = i;
       console.log(`Debug - Using row ${i} as headers:`, headers);
+      console.log(`Debug - Headers detailed:`, headers.map((h, idx) => `${idx}: "${h}" (length: ${h?.length || 0})`));
       break;
     }
   }
-  
+
   // If still no valid headers found, generate column names based on the first row length
-  if (headers.filter(h => h).length === 0 && values[0]) {
+  if (headers.filter((h) => h).length === 0 && values[0]) {
     console.log("Debug - No valid headers found, generating column names");
     const firstRowLength = values[0].length;
-    headers = Array.from({length: firstRowLength}, (_, i) => `Column ${i + 1}`);
+    headers = Array.from(
+      { length: firstRowLength },
+      (_, i) => `Column ${i + 1}`
+    );
     headerRowIndex = 0;
   }
   
+  // Additional check: if we have headers but they're mostly empty, try to use common Japanese form field names
+  const emptyHeaderCount = headers.filter(h => !h || h.trim() === '').length;
+  if (emptyHeaderCount > headers.length / 2) {
+    console.log("Debug - Most headers are empty, using common Japanese form field names");
+    const commonHeaders = [
+      'タイムスタンプ', 'メールアドレス', '代表者氏名', '参加区分', 
+      'おとな参加人数（中学生以上)', 'こども参加人数（年少～小学生）', 'こども参加人数（年少々以下）',
+      '連絡先', '備考', 'Column 10', 'Column 11', 'Column 12', 'Column 13'
+    ];
+    
+    for (let i = 0; i < headers.length; i++) {
+      if (!headers[i] || headers[i].trim() === '') {
+        headers[i] = commonHeaders[i] || `Column ${i + 1}`;
+      }
+    }
+    console.log("Debug - Updated headers with common names:", headers);
+  }
+
   const rows = values.slice(headerRowIndex + 1);
   console.log("Debug - Final headers:", headers);
   console.log("Debug - Using header row index:", headerRowIndex);
   console.log("Debug - Data rows count:", rows.length);
-  
+
   return { headers, rows };
 }
 

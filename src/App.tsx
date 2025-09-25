@@ -1020,11 +1020,12 @@ export default function App() {
     if (error) return; // silent; keep UI stable
     const headersFromFirst =
       (data?.[0]?.headers as string[] | undefined) ?? tableHeaders;
-    
+
     // Debug log to check what headers we're getting from DB
     console.log("Debug - Headers from DB:", data?.[0]?.headers);
     console.log("Debug - Final headers:", headersFromFirst);
-    
+    console.log("Debug - Headers detailed:", headersFromFirst.map((h, i) => `${i}: "${h}" (length: ${h?.length || 0})`));
+
     setTableHeaders(headersFromFirst);
     setRows(
       (data ?? []).map((r: any) => ({
