@@ -172,34 +172,53 @@ async function fetchSheetValues(
     headerRowIndex = 0;
   }
 
-  // Additional check: if we have headers but they're mostly empty, try to use common Japanese form field names
+  // Special case: if headers are empty but we have data, the first data row might be the actual headers
   const emptyHeaderCount = headers.filter((h) => !h || h.trim() === "").length;
-  if (emptyHeaderCount > headers.length / 2) {
-    console.log(
-      "Debug - Most headers are empty, using common Japanese form field names"
+  if (emptyHeaderCount > headers.length / 2 && values.length > headerRowIndex + 1) {
+    console.log("Debug - Headers mostly empty, checking if next row contains actual headers");
+    const nextRow = values[headerRowIndex + 1] ?? [];
+    const processedNextRow = nextRow.map((h: string) => (h ?? "").trim());
+    const nextRowNonEmptyCount = processedNextRow.filter(h => h).length;
+    
+    console.log("Debug - Next row:", nextRow);
+    console.log("Debug - Next row processed:", processedNextRow);
+    console.log("Debug - Next row non-empty count:", nextRowNonEmptyCount);
+    
+    // If the next row looks like headers (has many non-empty strings that look like field names)
+    const looksLikeHeaders = processedNextRow.some(h => 
+      h.includes('タイムスタンプ') || h.includes('メール') || h.includes('氏名') || 
+      h.includes('参加') || h.includes('人数') || h.includes('電話')
     );
-    const commonHeaders = [
-      "タイムスタンプ",
-      "メールアドレス",
-      "代表者氏名",
-      "参加区分",
-      "おとな参加人数（中学生以上)",
-      "こども参加人数（年少～小学生）",
-      "こども参加人数（年少々以下）",
-      "連絡先",
-      "備考",
-      "Column 10",
-      "Column 11",
-      "Column 12",
-      "Column 13",
-    ];
+    
+    if (looksLikeHeaders && nextRowNonEmptyCount > headers.length / 2) {
+      console.log("Debug - Next row appears to contain actual headers, using it instead");
+      headers = processedNextRow;
+      headerRowIndex = headerRowIndex + 1;
+    } else {
+      console.log("Debug - Using fallback Japanese form field names");
+      const commonHeaders = [
+        "タイムスタンプ",
+        "メールアドレス", 
+        "代表者氏名",
+        "フリガナ",
+        "参加区分",
+        "メールアドレス",
+        "電話番号",
+        "一般参加者の属性",
+        "おとな参加人数（中学生以上)",
+        "こども参加人数（年少～小学生）",
+        "仮装の意志確認",
+        "その他ご質問など",
+        "こども参加人数（年少々以下）",
+      ];
 
-    for (let i = 0; i < headers.length; i++) {
-      if (!headers[i] || headers[i].trim() === "") {
-        headers[i] = commonHeaders[i] || `Column ${i + 1}`;
+      for (let i = 0; i < headers.length; i++) {
+        if (!headers[i] || headers[i].trim() === "") {
+          headers[i] = commonHeaders[i] || `Column ${i + 1}`;
+        }
       }
     }
-    console.log("Debug - Updated headers with common names:", headers);
+    console.log("Debug - Final headers after processing:", headers);
   }
 
   const rows = values.slice(headerRowIndex + 1);
