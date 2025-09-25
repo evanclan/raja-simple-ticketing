@@ -7,6 +7,7 @@ type ActionRequest =
   | { action: "generate_link"; row_hash: string; baseUrl?: string }
   | { action: "resolve"; token: string }
   | { action: "check_in"; token: string; pin: string }
+  | { action: "test_db" }
   | {
       action: "send_email";
       row_hash: string;
@@ -56,7 +57,24 @@ function getSupabaseServiceClient() {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ||
     "";
   if (!serviceKey) throw new Error("Missing service role key");
-  return createClient(url, serviceKey);
+
+  console.log("Creating Supabase client with URL:", url);
+  console.log("Service key available:", serviceKey ? "Yes" : "No");
+
+  // Create client with service role key - this should bypass RLS
+  const client = createClient(url, serviceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+    db: {
+      schema: "public",
+    },
+  });
+
+  console.log("Client created with service key");
+
+  return client;
 }
 
 async function requireAdmin(req: Request): Promise<void> {
@@ -157,16 +175,36 @@ function isEmail(v: string): boolean {
 }
 
 function resolveAllowedFrom(requested?: string): string {
-  const fromEnv = (Deno.env.get("ALLOWED_FROM") || Deno.env.get("EMAIL_FROM") || "no-reply@example.com").trim();
+  const fromEnv = (
+    Deno.env.get("ALLOWED_FROM") ||
+    Deno.env.get("EMAIL_FROM") ||
+    "no-reply@example.com"
+  ).trim();
   const allowed = fromEnv
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
+
+  // If no specific sender requested, use first allowed or default
   if (!requested) return allowed[0] || "no-reply@example.com";
+
   const req = requested.trim();
+
+  // If no allowed senders configured, allow any sender
   if (allowed.length === 0) return req;
+
+  // Check if requested sender is in allowed list
   if (allowed.includes(req)) return req;
-  throw new Error("Sender not allowed");
+
+  // More detailed error message for debugging
+  console.error(
+    `Sender not allowed. Requested: "${req}", Allowed: ${JSON.stringify(
+      allowed
+    )}`
+  );
+  throw new Error(
+    `Sender not allowed: "${req}". Allowed senders: ${allowed.join(", ")}`
+  );
 }
 
 async function sendViaResend(params: {
@@ -226,7 +264,8 @@ Deno.serve(async (req) => {
 
     if (body.action === "generate_link") {
       await requireAdmin(req);
-      const baseUrl = body.baseUrl?.trim() || Deno.env.get("PUBLIC_APP_URL") || "";
+      const baseUrl =
+        body.baseUrl?.trim() || Deno.env.get("PUBLIC_APP_URL") || "";
       if (!baseUrl) throw new Error("Missing baseUrl (set PUBLIC_APP_URL)");
       if (!body.row_hash) throw new Error("row_hash is required");
       const token = await signToken({ rh: body.row_hash });
@@ -237,34 +276,136 @@ Deno.serve(async (req) => {
     }
 
     if (body.action === "resolve") {
-      const { rh } = await verifyToken(body.token);
-      if (!rh || typeof rh !== "string") throw new Error("Invalid token");
-      const { data, error } = await supabase
-        .from("paidparticipants")
-        .select("row_number, headers, data")
-        .eq("row_hash", rh)
-        .single();
-      if (error) throw error;
-      const { data: checkin, error: cErr } = await supabase
-        .from("checkins")
-        .select("row_hash, checked_in_at, checked_in_by")
-        .eq("row_hash", rh)
-        .maybeSingle();
-      if (cErr) throw cErr;
-      return new Response(
-        JSON.stringify({ ok: true, participant: data, checkin }),
-        { headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
+      try {
+        console.log("Starting resolve action...");
+        console.log("Token received:", body.token ? "Yes" : "No");
+
+        const { rh } = await verifyToken(body.token);
+        if (!rh || typeof rh !== "string") throw new Error("Invalid token");
+
+        console.log("Resolving entry pass for hash:", rh);
+
+        // Try using Supabase client directly - it should use service role key
+        console.log("Using Supabase client with service role...");
+        const { data, error } = await supabase
+          .from("paidparticipants")
+          .select("row_number, headers, data")
+          .eq("row_hash", rh)
+          .single();
+
+        if (error) {
+          console.error("Supabase client error:", error);
+          console.error("Error code:", error.code);
+          console.error("Error message:", error.message);
+          console.error("Error details:", error.details);
+          console.error("Error hint:", error.hint);
+          throw new Error(
+            `Database error: ${error.message} (Code: ${error.code})`
+          );
+        }
+
+        console.log("Participant data fetched successfully");
+
+        const { data: checkin, error: cErr } = await supabase
+          .from("checkins")
+          .select("row_hash, checked_in_at, checked_in_by")
+          .eq("row_hash", rh)
+          .maybeSingle();
+
+        if (cErr) {
+          console.warn("Checkin fetch error:", cErr.message);
+        }
+
+        return new Response(
+          JSON.stringify({ ok: true, participant: data, checkin }),
+          { headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      } catch (error) {
+        console.error("Error in resolve action:", error);
+        throw error;
+      }
+    }
+
+    if (body.action === "test_db") {
+      try {
+        console.log("Testing database connection with service role...");
+
+        // Test 1: Try to query paidparticipants table
+        const {
+          data: testData,
+          error: testError,
+          count,
+        } = await supabase
+          .from("paidparticipants")
+          .select("row_hash", { count: "exact" })
+          .limit(1);
+
+        if (testError) {
+          console.error("Test query failed:", testError);
+          return new Response(
+            JSON.stringify({
+              ok: false,
+              error: "Database test failed",
+              details: testError,
+              service_key_length: (
+                Deno.env.get("SERVICE_ROLE_KEY") ||
+                Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ||
+                ""
+              ).length,
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json", ...corsHeaders },
+            }
+          );
+        }
+
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            message: "Database connection successful",
+            count: count,
+            has_data: testData && testData.length > 0,
+            service_key_length: (
+              Deno.env.get("SERVICE_ROLE_KEY") ||
+              Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ||
+              ""
+            ).length,
+          }),
+          { headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      } catch (error) {
+        console.error("Test action error:", error);
+        return new Response(
+          JSON.stringify({
+            ok: false,
+            error: "Test failed with exception",
+            message: error.message,
+            service_key_length: (
+              Deno.env.get("SERVICE_ROLE_KEY") ||
+              Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ||
+              ""
+            ).length,
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json", ...corsHeaders },
+          }
+        );
+      }
     }
 
     if (body.action === "check_in") {
       const ip = req.headers.get("x-forwarded-for") || "unknown";
       const key = `${ip}:${(body.token || "").slice(0, 16)}`;
       if (!rateLimitPin(key)) {
-        return new Response(JSON.stringify({ ok: false, error: "Too many attempts" }), {
-          status: 429,
-          headers: { "Content-Type": "application/json", ...corsHeaders },
-        });
+        return new Response(
+          JSON.stringify({ ok: false, error: "Too many attempts" }),
+          {
+            status: 429,
+            headers: { "Content-Type": "application/json", ...corsHeaders },
+          }
+        );
       }
       const pin = (body.pin || "").trim();
       const expected = requiredEnv("ENTRY_ADMIN_PIN");
@@ -289,7 +430,8 @@ Deno.serve(async (req) => {
 
     if (body.action === "send_email") {
       await requireAdmin(req);
-      const baseUrl = body.baseUrl?.trim() || Deno.env.get("PUBLIC_APP_URL") || "";
+      const baseUrl =
+        body.baseUrl?.trim() || Deno.env.get("PUBLIC_APP_URL") || "";
       if (!baseUrl) throw new Error("Missing baseUrl (set PUBLIC_APP_URL)");
       if (!body.row_hash) throw new Error("row_hash is required");
       const token = await signToken({ rh: body.row_hash });
@@ -300,9 +442,18 @@ Deno.serve(async (req) => {
         .eq("row_hash", body.row_hash)
         .single();
       if (error) throw error;
-      const to = (body.to || detectEmail(data?.headers, data?.data) || "").trim();
-      if (!to || !isEmail(to)) throw new Error("Recipient email not found for this row");
-      const name = (body.name || detectName(data?.headers, data?.data) || "").trim();
+      const to = (
+        body.to ||
+        detectEmail(data?.headers, data?.data) ||
+        ""
+      ).trim();
+      if (!to || !isEmail(to))
+        throw new Error("Recipient email not found for this row");
+      const name = (
+        body.name ||
+        detectName(data?.headers, data?.data) ||
+        ""
+      ).trim();
       const subject = (body.subject || "Your Entry Pass").trim();
       const from = resolveAllowedFrom(body.from);
       const defaultHtml = `<div>
@@ -311,7 +462,9 @@ Deno.serve(async (req) => {
   <p>This is your entry pass. Show this link at the entrance on event day.</p>
   <p><a href="${url}">${url}</a></p>
 </div>`;
-      const defaultText = `${name ? `${name} 様\n` : ""}イベントの入場用リンクです。当日入口でスタッフにお見せください。\nThis is your entry pass. Show this link at the entrance.\n${url}`;
+      const defaultText = `${
+        name ? `${name} 様\n` : ""
+      }イベントの入場用リンクです。当日入口でスタッフにお見せください。\nThis is your entry pass. Show this link at the entrance.\n${url}`;
       const html = body.html || defaultHtml;
       const text = body.text || defaultText;
       const result = await sendViaResend({ to, subject, html, text, from });
@@ -323,7 +476,8 @@ Deno.serve(async (req) => {
 
     if (body.action === "bulk_send") {
       await requireAdmin(req);
-      const baseUrl = body.baseUrl?.trim() || Deno.env.get("PUBLIC_APP_URL") || "";
+      const baseUrl =
+        body.baseUrl?.trim() || Deno.env.get("PUBLIC_APP_URL") || "";
       if (!baseUrl) throw new Error("Missing baseUrl (set PUBLIC_APP_URL)");
       const from = resolveAllowedFrom(body.from);
       const { data, error } = await supabase
@@ -344,7 +498,11 @@ Deno.serve(async (req) => {
           const url = `${baseUrl.replace(/\/$/, "")}/pass/${token}`;
           const to = detectEmail(row.headers as any, row.data as any);
           if (!to || !isEmail(to)) {
-            results.push({ row_hash: row.row_hash, skipped: true, reason: "no-email" });
+            results.push({
+              row_hash: row.row_hash,
+              skipped: true,
+              reason: "no-email",
+            });
             continue;
           }
           const name = detectName(row.headers as any, row.data as any) || "";
@@ -355,16 +513,30 @@ Deno.serve(async (req) => {
   <p>This is your entry pass. Show this link at the entrance on event day.</p>
   <p><a href="${url}">${url}</a></p>
 </div>`;
-          const text = `${name ? `${name} 様\n` : ""}イベントの入場用リンクです。当日入口でスタッフにお見せください。\nThis is your entry pass. Show this link at the entrance.\n${url}`;
+          const text = `${
+            name ? `${name} 様\n` : ""
+          }イベントの入場用リンクです。当日入口でスタッフにお見せください。\nThis is your entry pass. Show this link at the entrance.\n${url}`;
           try {
-            const result = await sendViaResend({ to, subject, html, text, from });
+            const result = await sendViaResend({
+              to,
+              subject,
+              html,
+              text,
+              from,
+            });
             results.push({ row_hash: row.row_hash, sent: true, result });
           } catch (e: any) {
-            results.push({ row_hash: row.row_hash, sent: false, error: e?.message || String(e) });
+            results.push({
+              row_hash: row.row_hash,
+              sent: false,
+              error: e?.message || String(e),
+            });
           }
         }
       }
-      const workers = Array.from({ length: Math.min(CONC, list.length) }, () => worker());
+      const workers = Array.from({ length: Math.min(CONC, list.length) }, () =>
+        worker()
+      );
       await Promise.all(workers);
       return new Response(JSON.stringify({ ok: true, results }), {
         headers: { "Content-Type": "application/json", ...corsHeaders },
@@ -376,11 +548,19 @@ Deno.serve(async (req) => {
       headers: { "Content-Type": "application/json", ...corsHeaders },
     });
   } catch (err: any) {
+    console.error("Function error:", err);
+    console.error("Error stack:", err?.stack);
     return new Response(
-      JSON.stringify({ error: err?.message ?? String(err) }),
+      JSON.stringify({
+        error: err?.message ?? String(err),
+        details: err?.stack ? err.stack.split("\n").slice(0, 5) : undefined,
+      }),
       {
         status: 400,
-        headers: { "Content-Type": "application/json", ...getCorsHeaders(req.headers.get("Origin")) },
+        headers: {
+          "Content-Type": "application/json",
+          ...getCorsHeaders(req.headers.get("Origin")),
+        },
       }
     );
   }

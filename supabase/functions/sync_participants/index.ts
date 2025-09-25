@@ -174,31 +174,43 @@ async function fetchSheetValues(
 
   // Special case: if headers are empty but we have data, the first data row might be the actual headers
   const emptyHeaderCount = headers.filter((h) => !h || h.trim() === "").length;
-  if (emptyHeaderCount > headers.length / 2 && values.length > headerRowIndex + 1) {
-    console.log("Debug - Headers mostly empty, checking if next row contains actual headers");
+  if (
+    emptyHeaderCount > headers.length / 2 &&
+    values.length > headerRowIndex + 1
+  ) {
+    console.log(
+      "Debug - Headers mostly empty, checking if next row contains actual headers"
+    );
     const nextRow = values[headerRowIndex + 1] ?? [];
     const processedNextRow = nextRow.map((h: string) => (h ?? "").trim());
-    const nextRowNonEmptyCount = processedNextRow.filter(h => h).length;
-    
+    const nextRowNonEmptyCount = processedNextRow.filter((h) => h).length;
+
     console.log("Debug - Next row:", nextRow);
     console.log("Debug - Next row processed:", processedNextRow);
     console.log("Debug - Next row non-empty count:", nextRowNonEmptyCount);
-    
+
     // If the next row looks like headers (has many non-empty strings that look like field names)
-    const looksLikeHeaders = processedNextRow.some(h => 
-      h.includes('タイムスタンプ') || h.includes('メール') || h.includes('氏名') || 
-      h.includes('参加') || h.includes('人数') || h.includes('電話')
+    const looksLikeHeaders = processedNextRow.some(
+      (h) =>
+        h.includes("タイムスタンプ") ||
+        h.includes("メール") ||
+        h.includes("氏名") ||
+        h.includes("参加") ||
+        h.includes("人数") ||
+        h.includes("電話")
     );
-    
+
     if (looksLikeHeaders && nextRowNonEmptyCount > headers.length / 2) {
-      console.log("Debug - Next row appears to contain actual headers, using it instead");
+      console.log(
+        "Debug - Next row appears to contain actual headers, using it instead"
+      );
       headers = processedNextRow;
       headerRowIndex = headerRowIndex + 1;
     } else {
       console.log("Debug - Using fallback Japanese form field names");
       const commonHeaders = [
         "タイムスタンプ",
-        "メールアドレス", 
+        "メールアドレス",
         "代表者氏名",
         "フリガナ",
         "参加区分",

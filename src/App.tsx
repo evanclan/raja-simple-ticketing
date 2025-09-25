@@ -499,6 +499,7 @@ function EntryPassView({ token }: { token: string }) {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
+              apikey: import.meta.env.VITE_SUPABASE_ANON_KEY as string,
             },
             body: JSON.stringify({ action: "resolve", token }),
           }
@@ -541,6 +542,7 @@ function EntryPassView({ token }: { token: string }) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY as string,
         },
         body: JSON.stringify({ action: "check_in", token, pin }),
       });
@@ -553,6 +555,7 @@ function EntryPassView({ token }: { token: string }) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY as string,
         },
         body: JSON.stringify({ action: "resolve", token }),
       });
@@ -1024,7 +1027,10 @@ export default function App() {
     // Debug log to check what headers we're getting from DB
     console.log("Debug - Headers from DB:", data?.[0]?.headers);
     console.log("Debug - Final headers:", headersFromFirst);
-    console.log("Debug - Headers detailed:", headersFromFirst.map((h, i) => `${i}: "${h}" (length: ${h?.length || 0})`));
+    console.log(
+      "Debug - Headers detailed:",
+      headersFromFirst.map((h, i) => `${i}: "${h}" (length: ${h?.length || 0})`)
+    );
 
     setTableHeaders(headersFromFirst);
     setRows(
