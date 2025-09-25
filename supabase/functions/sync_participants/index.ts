@@ -153,7 +153,10 @@ async function fetchSheetValues(
       headers = processedRow;
       headerRowIndex = i;
       console.log(`Debug - Using row ${i} as headers:`, headers);
-      console.log(`Debug - Headers detailed:`, headers.map((h, idx) => `${idx}: "${h}" (length: ${h?.length || 0})`));
+      console.log(
+        `Debug - Headers detailed:`,
+        headers.map((h, idx) => `${idx}: "${h}" (length: ${h?.length || 0})`)
+      );
       break;
     }
   }
@@ -168,19 +171,31 @@ async function fetchSheetValues(
     );
     headerRowIndex = 0;
   }
-  
+
   // Additional check: if we have headers but they're mostly empty, try to use common Japanese form field names
-  const emptyHeaderCount = headers.filter(h => !h || h.trim() === '').length;
+  const emptyHeaderCount = headers.filter((h) => !h || h.trim() === "").length;
   if (emptyHeaderCount > headers.length / 2) {
-    console.log("Debug - Most headers are empty, using common Japanese form field names");
+    console.log(
+      "Debug - Most headers are empty, using common Japanese form field names"
+    );
     const commonHeaders = [
-      'タイムスタンプ', 'メールアドレス', '代表者氏名', '参加区分', 
-      'おとな参加人数（中学生以上)', 'こども参加人数（年少～小学生）', 'こども参加人数（年少々以下）',
-      '連絡先', '備考', 'Column 10', 'Column 11', 'Column 12', 'Column 13'
+      "タイムスタンプ",
+      "メールアドレス",
+      "代表者氏名",
+      "参加区分",
+      "おとな参加人数（中学生以上)",
+      "こども参加人数（年少～小学生）",
+      "こども参加人数（年少々以下）",
+      "連絡先",
+      "備考",
+      "Column 10",
+      "Column 11",
+      "Column 12",
+      "Column 13",
     ];
-    
+
     for (let i = 0; i < headers.length; i++) {
-      if (!headers[i] || headers[i].trim() === '') {
+      if (!headers[i] || headers[i].trim() === "") {
         headers[i] = commonHeaders[i] || `Column ${i + 1}`;
       }
     }
