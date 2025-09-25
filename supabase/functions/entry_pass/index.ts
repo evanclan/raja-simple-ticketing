@@ -260,6 +260,14 @@ Deno.serve(async (req) => {
 
   try {
     const body = (await req.json()) as ActionRequest;
+    
+    // Check if this is a public action that doesn't require authentication
+    const publicActions = ["resolve", "test_db"];
+    const isPublicAction = publicActions.includes(body.action);
+    
+    console.log(`Action: ${body.action}, IsPublic: ${isPublicAction}`);
+    
+    // For public actions, we still need to use the service client but don't require user auth
     const supabase = getSupabaseServiceClient();
 
     if (body.action === "generate_link") {

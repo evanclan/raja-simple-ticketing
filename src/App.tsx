@@ -499,7 +499,8 @@ function EntryPassView({ token }: { token: string }) {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              apikey: import.meta.env.VITE_SUPABASE_ANON_KEY as string,
+              "apikey": import.meta.env.VITE_SUPABASE_ANON_KEY as string,
+              "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY as string}`,
             },
             body: JSON.stringify({ action: "resolve", token }),
           }
@@ -542,7 +543,8 @@ function EntryPassView({ token }: { token: string }) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY as string,
+          "apikey": import.meta.env.VITE_SUPABASE_ANON_KEY as string,
+          "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY as string}`,
         },
         body: JSON.stringify({ action: "check_in", token, pin }),
       });
@@ -555,7 +557,8 @@ function EntryPassView({ token }: { token: string }) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY as string,
+          "apikey": import.meta.env.VITE_SUPABASE_ANON_KEY as string,
+          "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY as string}`,
         },
         body: JSON.stringify({ action: "resolve", token }),
       });
