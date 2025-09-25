@@ -887,7 +887,7 @@ export default function App() {
       }
     })();
 
-    const sub = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const sub = supabase.auth.onAuthStateChange(async (_event: any, session: any) => {
       setUserEmail(session?.user?.email ?? null);
       setUserToken(session?.access_token ?? null);
     });
@@ -1464,7 +1464,7 @@ export default function App() {
       data: r.data as Record<string, any>,
     }));
     setPaidRows(mapped);
-    setPaidHashes(new Set(mapped.map((r) => r.row_hash)));
+    setPaidHashes(new Set(mapped.map((r: any) => r.row_hash)));
   }
 
   useEffect(() => {
