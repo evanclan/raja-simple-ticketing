@@ -845,8 +845,10 @@ export default function App() {
   const [calcLoading, setCalcLoading] = useState<boolean>(false);
   const [adultCount, setAdultCount] = useState<number>(0);
   const [childCount, setChildCount] = useState<number>(0);
+  const [infantCount, setInfantCount] = useState<number>(0);
   const [adultHeaderKey, setAdultHeaderKey] = useState<string | null>(null);
   const [childHeaderKey, setChildHeaderKey] = useState<string | null>(null);
+  const [infantHeaderKey, setInfantHeaderKey] = useState<string | null>(null);
   const [categoryHeaderKey, setCategoryHeaderKey] = useState<string | null>(
     null
   );
@@ -859,6 +861,7 @@ export default function App() {
     name: string;
     adult: number;
     child: number;
+    infant: number;
     category: string;
     total: number;
   };
@@ -1104,6 +1107,18 @@ export default function App() {
         "こども参加人数",
         "child",
       ]) || null;
+    // Infant related patterns (年少々以下)
+    const infantKey =
+      detectKey([
+        "年少々以下",
+        "未就学",
+        "幼児",
+        "乳幼児",
+        "未就園",
+        "赤ちゃん",
+        "baby",
+        "infant",
+      ]) || null;
     // Category related patterns (参加区分)
     const categoryKey =
       detectKey([
@@ -1128,6 +1143,7 @@ export default function App() {
       ]) || null;
     setAdultHeaderKey(adultKey);
     setChildHeaderKey(childKey);
+    setInfantHeaderKey(infantKey);
     setCategoryHeaderKey(categoryKey);
     setRepNameHeaderKey(repNameKey);
   }, [tableHeaders]);
@@ -1138,7 +1154,13 @@ export default function App() {
       calculateTotalsAcrossAllRows();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userEmail, adultHeaderKey, childHeaderKey, categoryHeaderKey]);
+  }, [
+    userEmail,
+    adultHeaderKey,
+    childHeaderKey,
+    infantHeaderKey,
+    categoryHeaderKey,
+  ]);
 
   function normalizeDigits(input: string): string {
     if (!input) return "";
@@ -1375,6 +1397,7 @@ export default function App() {
     try {
       const ADULT_KEY = adultHeaderKey;
       const CHILD_KEY = childHeaderKey;
+      const INFANT_KEY = infantHeaderKey;
       const CATEGORY_KEY = categoryHeaderKey;
       if (!ADULT_KEY || !CHILD_KEY) {
         // We will still try to compute, but most likely counts will remain 0
@@ -1385,6 +1408,7 @@ export default function App() {
       let from = 0;
       let totalAdult = 0;
       let totalChild = 0;
+      let totalInfant = 0;
       let totalAmount = 0;
       // Fetch in chunks until fewer than CHUNK_SIZE rows are returned
       // We only need headers and data for counting
@@ -1403,11 +1427,14 @@ export default function App() {
           const d = row.data || {};
           const adultVal = ADULT_KEY ? d[ADULT_KEY] : undefined;
           const childVal = CHILD_KEY ? d[CHILD_KEY] : undefined;
+          const infantVal = INFANT_KEY ? d[INFANT_KEY] : undefined;
           const categoryVal = CATEGORY_KEY ? d[CATEGORY_KEY] : undefined;
           const a = parseCount(adultVal);
           const c = parseCount(childVal);
+          const i = parseCount(infantVal);
           totalAdult += a;
           totalChild += c;
+          totalInfant += i;
           const isRaja = isRajaFamily(categoryVal);
           totalAmount += computeRowPrice(a, c, isRaja);
         }
@@ -1416,6 +1443,7 @@ export default function App() {
       }
       setAdultCount(totalAdult);
       setChildCount(totalChild);
+      setInfantCount(totalInfant);
       setEstimatedTotal(totalAmount);
     } finally {
       setCalcLoading(false);
@@ -1427,6 +1455,7 @@ export default function App() {
     try {
       const ADULT_KEY = adultHeaderKey;
       const CHILD_KEY = childHeaderKey;
+      const INFANT_KEY = infantHeaderKey;
       const CATEGORY_KEY = categoryHeaderKey;
       const NAME_KEY = repNameHeaderKey;
 
@@ -1450,15 +1479,17 @@ export default function App() {
           const d = row.data || {};
           const a = parseCount(ADULT_KEY ? d[ADULT_KEY] : undefined);
           const c = parseCount(CHILD_KEY ? d[CHILD_KEY] : undefined);
+          const i = parseCount(INFANT_KEY ? d[INFANT_KEY] : undefined);
           const catVal = CATEGORY_KEY ? d[CATEGORY_KEY] : undefined;
           const nameVal = NAME_KEY ? d[NAME_KEY] : undefined;
           const total = computeRowPrice(a, c, isRajaFamily(catVal));
-          if (a + c <= 0 || total <= 0) continue;
+          if (a + c + i <= 0 || total <= 0) continue;
           accum.push({
             rowNumber: row.row_number,
             name: String(nameVal ?? ""),
             adult: a,
             child: c,
+            infant: i,
             category: String(catVal ?? ""),
             total,
           });
@@ -2355,6 +2386,14 @@ export default function App() {
                         </div>
                         <div className="block">
                           <span className="text-sm text-gray-700">
+                            検出された赤ちゃんの数の項目名
+                          </span>
+                          <div className="mt-1 text-sm text-gray-800">
+                            {infantHeaderKey || "(not detected)"}
+                          </div>
+                        </div>
+                        <div className="block">
+                          <span className="text-sm text-gray-700">
                             検出された参加区分の項目名
                           </span>
                           <div className="mt-1 text-sm text-gray-800">
@@ -2377,6 +2416,22 @@ export default function App() {
                           </div>
                           <div className="text-lg font-semibold">
                             {childCount}
+                          </div>
+                        </div>
+                        <div className="rounded bg-gray-50 p-3">
+                          <div className="text-xs text-gray-500">
+                            登録済み赤ちゃんの数（合計）
+                          </div>
+                          <div className="text-lg font-semibold">
+                            {infantCount}
+                          </div>
+                        </div>
+                        <div className="rounded bg-blue-50 p-3">
+                          <div className="text-xs text-gray-500">
+                            登録済み総人数（合計）
+                          </div>
+                          <div className="text-lg font-semibold text-blue-700">
+                            {adultCount + childCount + infantCount}
                           </div>
                         </div>
                       </div>
@@ -2526,6 +2581,9 @@ export default function App() {
                                         こども参加人数（年少～小学生）
                                       </th>
                                       <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
+                                        赤ちゃんの数（年少々以下）
+                                      </th>
+                                      <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
                                         参加区分
                                       </th>
                                       <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
@@ -2550,6 +2608,9 @@ export default function App() {
                                         </td>
                                         <td className="px-3 py-2 text-gray-800 whitespace-nowrap">
                                           {d.child}
+                                        </td>
+                                        <td className="px-3 py-2 text-gray-800 whitespace-nowrap">
+                                          {d.infant}
                                         </td>
                                         <td className="px-3 py-2 text-gray-800 whitespace-nowrap">
                                           {d.category}
