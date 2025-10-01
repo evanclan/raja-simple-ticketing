@@ -800,7 +800,9 @@ export default function App() {
   const [sentConfirmations, setSentConfirmations] = useState<Set<string>>(
     new Set()
   );
-  const [activePage, setActivePage] = useState<"main" | "editMail">("main");
+  const [activePage, setActivePage] = useState<
+    "main" | "editMail" | "editEntryPass"
+  >("main");
   const [subjectTemplate, setSubjectTemplate] = useState<string>(
     "Payment confirmation"
   );
@@ -832,6 +834,59 @@ export default function App() {
       return saved ? new Set(JSON.parse(saved)) : new Set();
     } catch {
       return new Set();
+    }
+  });
+
+  // Entry pass email template state
+  const [entryPassSubject, setEntryPassSubject] = useState<string>(() => {
+    try {
+      return localStorage.getItem("entry_pass_subject") || "Your Entry Pass";
+    } catch {
+      return "Your Entry Pass";
+    }
+  });
+  const [entryPassHtml, setEntryPassHtml] = useState<string>(() => {
+    try {
+      return (
+        localStorage.getItem("entry_pass_html") ||
+        `<div>
+  <p>{{name}} 様</p>
+  <p>イベントの入場用リンクです。こちらのリンクを当日入口でスタッフにお見せください。</p>
+  <p>This is your entry pass. Show this link at the entrance on event day.</p>
+  <p><a href="{{url}}">{{url}}</a></p>
+</div>`
+      );
+    } catch {
+      return `<div>
+  <p>{{name}} 様</p>
+  <p>イベントの入場用リンクです。こちらのリンクを当日入口でスタッフにお見せください。</p>
+  <p>This is your entry pass. Show this link at the entrance on event day.</p>
+  <p><a href="{{url}}">{{url}}</a></p>
+</div>`;
+    }
+  });
+  const [entryPassText, setEntryPassText] = useState<string>(() => {
+    try {
+      return (
+        localStorage.getItem("entry_pass_text") ||
+        `{{name}} 様
+イベントの入場用リンクです。当日入口でスタッフにお見せください。
+This is your entry pass. Show this link at the entrance.
+{{url}}`
+      );
+    } catch {
+      return `{{name}} 様
+イベントの入場用リンクです。当日入口でスタッフにお見せください。
+This is your entry pass. Show this link at the entrance.
+{{url}}`;
+    }
+  });
+  const [entryPassPdf, setEntryPassPdf] = useState<File | null>(null);
+  const [entryPassPdfUrl, setEntryPassPdfUrl] = useState<string>(() => {
+    try {
+      return localStorage.getItem("entry_pass_pdf_url") || "";
+    } catch {
+      return "";
     }
   });
   const [isBulkSendingPasses, setIsBulkSendingPasses] =
@@ -1237,6 +1292,13 @@ export default function App() {
     localStorage.setItem("email_tpl_html", htmlTemplate);
     localStorage.setItem("email_tpl_text", textTemplate);
     localStorage.setItem("email_tpl_from", fromDisplay);
+  }
+
+  function persistEntryPassTemplates() {
+    localStorage.setItem("entry_pass_subject", entryPassSubject);
+    localStorage.setItem("entry_pass_html", entryPassHtml);
+    localStorage.setItem("entry_pass_text", entryPassText);
+    localStorage.setItem("entry_pass_pdf_url", entryPassPdfUrl);
   }
 
   function persistSentPasses(next: Set<string>) {
@@ -1682,6 +1744,9 @@ export default function App() {
       }
       setSendingPassHash(row.row_hash);
       const baseUrl = window.location.origin;
+
+      // Templates will be processed on the backend with the actual participant data
+
       const resp = await fetch(`${supabaseUrl}/functions/v1/entry_pass`, {
         method: "POST",
         headers: {
@@ -1693,6 +1758,10 @@ export default function App() {
           row_hash: row.row_hash,
           baseUrl,
           from: fromDisplay,
+          subject: entryPassSubject,
+          html: entryPassHtml,
+          text: entryPassText,
+          pdfUrl: entryPassPdfUrl || undefined,
         }),
       });
       if (!resp.ok) {
@@ -1733,6 +1802,10 @@ export default function App() {
           action: "bulk_send",
           baseUrl,
           from: fromDisplay,
+          subject: entryPassSubject,
+          html: entryPassHtml,
+          text: entryPassText,
+          pdfUrl: entryPassPdfUrl || undefined,
         }),
       });
       if (!resp.ok) {
@@ -1787,6 +1860,10 @@ export default function App() {
           baseUrl,
           from: fromDisplay,
           to: testTo,
+          subject: entryPassSubject,
+          html: entryPassHtml,
+          text: entryPassText,
+          pdfUrl: entryPassPdfUrl || undefined,
         }),
       });
       if (!resp.ok) {
@@ -2069,6 +2146,175 @@ export default function App() {
                   </div>
                 </div>
               </div>
+            ) : activePage === "editEntryPass" ? (
+              <div className="grid gap-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-medium">
+                    入場パス メール編集 (Entry Pass Email Editor)
+                  </h3>
+                  <button
+                    onClick={() => setActivePage("main")}
+                    className="rounded border px-3 py-1 text-sm text-indigo-700 border-indigo-300 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  >
+                    戻る
+                  </button>
+                </div>
+                <div className="rounded border p-4 grid gap-3">
+                  <div className="text-sm text-gray-700">
+                    変数は二重かっこで挿入できます（例）： {"{{name}}"}、{" "}
+                    {"{{email}}"}、 {"{{url}}"}
+                  </div>
+                  <label className="block">
+                    <span className="text-sm text-gray-700">
+                      送信者（From）
+                    </span>
+                    <input
+                      className="mt-1 w-full rounded border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-300"
+                      value={fromDisplay}
+                      onChange={(e) => setFromDisplay(e.target.value)}
+                      placeholder="RaJA <no-reply@info.raja-international.com>"
+                    />
+                  </label>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <label className="block">
+                      <span className="text-sm text-gray-700">
+                        テスト送信先
+                      </span>
+                      <input
+                        className="mt-1 w-full rounded border px-3 py-2"
+                        type="email"
+                        value={entryPassTestRecipient}
+                        onChange={(e) =>
+                          setEntryPassTestRecipient(e.target.value)
+                        }
+                        placeholder="test@example.com"
+                      />
+                    </label>
+                    <div className="flex items-end">
+                      <button
+                        onClick={handleSendTestEntryPass}
+                        disabled={isSendingTestPass}
+                        className="rounded bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 disabled:opacity-50"
+                      >
+                        {isSendingTestPass ? "送信中…" : "テスト入場パス送信"}
+                      </button>
+                    </div>
+                  </div>
+                  <label className="block">
+                    <span className="text-sm text-gray-700">件名</span>
+                    <input
+                      className="mt-1 w-full rounded border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-300"
+                      value={entryPassSubject}
+                      onChange={(e) => setEntryPassSubject(e.target.value)}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-sm text-gray-700">
+                      PDF添付 (Event Day Instructions)
+                    </span>
+                    <div className="mt-1 space-y-2">
+                      <input
+                        type="file"
+                        accept=".pdf"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file && file.type === "application/pdf") {
+                            setEntryPassPdf(file);
+                            // For demo purposes, we'll use a placeholder URL
+                            // In production, you'd upload this to your storage service
+                            const url = URL.createObjectURL(file);
+                            setEntryPassPdfUrl(url);
+                          } else {
+                            alert("PDFファイルを選択してください");
+                          }
+                        }}
+                        className="w-full rounded border px-3 py-2"
+                      />
+                      {entryPassPdf && (
+                        <div className="text-sm text-green-600">
+                          選択済み: {entryPassPdf.name}
+                        </div>
+                      )}
+                      <input
+                        type="url"
+                        placeholder="または PDF の URL を入力"
+                        value={entryPassPdfUrl}
+                        onChange={(e) => setEntryPassPdfUrl(e.target.value)}
+                        className="w-full rounded border px-3 py-2"
+                      />
+                    </div>
+                  </label>
+                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                    <label className="block">
+                      <span className="text-sm text-gray-700">HTML本文</span>
+                      <textarea
+                        rows={12}
+                        className="mt-1 w-full rounded border px-3 py-2 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-300"
+                        value={entryPassHtml}
+                        onChange={(e) => setEntryPassHtml(e.target.value)}
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-sm text-gray-700">
+                        プレーンテキスト本文
+                      </span>
+                      <textarea
+                        rows={12}
+                        className="mt-1 w-full rounded border px-3 py-2 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-300"
+                        value={entryPassText}
+                        onChange={(e) => setEntryPassText(e.target.value)}
+                      />
+                    </label>
+                  </div>
+                  <div className="flex flex-wrap gap-2 items-center">
+                    {["name", "email", "url"].map((v) => (
+                      <button
+                        key={v}
+                        onClick={() => {
+                          const token = `{{${v}}}`;
+                          setEntryPassHtml((prev) => prev + token);
+                          setEntryPassText((prev) => prev + token);
+                        }}
+                        className="rounded border px-2 py-1 text-xs text-indigo-700 border-indigo-300 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                      >
+                        差し込み {"{{"}
+                        {v}
+                        {"}}"}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        persistEntryPassTemplates();
+                        alert("Saved.");
+                      }}
+                      className="rounded bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700"
+                    >
+                      保存
+                    </button>
+                    <button
+                      onClick={() => {
+                        setEntryPassSubject("Your Entry Pass");
+                        setEntryPassHtml(`<div>
+  <p>{{name}} 様</p>
+  <p>イベントの入場用リンクです。こちらのリンクを当日入口でスタッフにお見せください。</p>
+  <p>This is your entry pass. Show this link at the entrance on event day.</p>
+  <p><a href="{{url}}">{{url}}</a></p>
+</div>`);
+                        setEntryPassText(`{{name}} 様
+イベントの入場用リンクです。当日入口でスタッフにお見せください。
+This is your entry pass. Show this link at the entrance.
+{{url}}`);
+                        setTimeout(() => persistEntryPassTemplates(), 0);
+                      }}
+                      className="rounded border px-4 py-2 text-indigo-700 border-indigo-300 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                    >
+                      既定にリセット
+                    </button>
+                  </div>
+                </div>
+              </div>
             ) : (
               <>
                 <div className="mt-4 flex items-center gap-3">
@@ -2336,12 +2582,18 @@ export default function App() {
                         </tbody>
                       </table>
                     </div>
-                    <div className="mt-3">
+                    <div className="mt-3 flex gap-2">
                       <button
                         onClick={() => setActivePage("editMail")}
                         className="rounded border px-3 py-1 text-sm text-indigo-700 border-indigo-300 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-300"
                       >
                         自動メール編集
+                      </button>
+                      <button
+                        onClick={() => setActivePage("editEntryPass")}
+                        className="rounded border px-3 py-1 text-sm text-indigo-700 border-indigo-300 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                      >
+                        入場パス メール編集
                       </button>
                     </div>
                     {/* Estimated Expected Calculation */}

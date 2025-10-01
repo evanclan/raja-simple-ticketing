@@ -28,8 +28,17 @@ type ActionRequest =
       html?: string;
       text?: string;
       from?: string;
+      pdfUrl?: string;
     }
-  | { action: "bulk_send"; baseUrl?: string; from?: string };
+  | {
+      action: "bulk_send";
+      baseUrl?: string;
+      from?: string;
+      subject?: string;
+      html?: string;
+      text?: string;
+      pdfUrl?: string;
+    };
 
 // Rate limiting storage
 const rateLimitStore = new Map<string, { count: number; ts: number }>();
@@ -337,6 +346,11 @@ async function sendViaResend(params: {
   html: string;
   text: string;
   from: string;
+  attachments?: Array<{
+    filename: string;
+    content: string;
+    content_type: string;
+  }>;
 }) {
   const apiKey = Deno.env.get("RESEND_API_KEY");
   if (!apiKey) throw new Error("Missing RESEND_API_KEY env var");
@@ -353,6 +367,54 @@ async function sendViaResend(params: {
     throw new Error(`Resend API error: ${err}`);
   }
   return await res.json();
+}
+
+// Helper function to fetch PDF content for attachment
+async function fetchPdfAttachment(pdfUrl: string): Promise<{
+  filename: string;
+  content: string;
+  content_type: string;
+} | null> {
+  try {
+    if (!pdfUrl || !validateUrl(pdfUrl)) return null;
+
+    const response = await fetch(pdfUrl);
+    if (!response.ok) return null;
+
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/pdf")) return null;
+
+    const arrayBuffer = await response.arrayBuffer();
+    const base64Content = btoa(
+      String.fromCharCode(...new Uint8Array(arrayBuffer))
+    );
+
+    // Extract filename from URL or use default
+    const urlParts = pdfUrl.split("/");
+    const filename = urlParts[urlParts.length - 1] || "event-instructions.pdf";
+
+    return {
+      filename: filename.endsWith(".pdf") ? filename : `${filename}.pdf`,
+      content: base64Content,
+      content_type: "application/pdf",
+    };
+  } catch (error) {
+    secureLog("Error fetching PDF attachment", { error: error.message });
+    return null;
+  }
+}
+
+// Template processing function
+function processEmailTemplate(
+  template: string,
+  variables: Record<string, string>
+): string {
+  let processed = template;
+  for (const [key, value] of Object.entries(variables)) {
+    const regex = new RegExp(`\\{\\{${key}\\}\\}`, "g");
+    processed = processed.replace(regex, value || "");
+  }
+  return processed;
 }
 
 // Legacy function - removed in favor of enhanced checkPinRateLimit
@@ -620,6 +682,14 @@ Deno.serve(async (req) => {
       ).trim();
       const subject = (body.subject || "Your Entry Pass").trim();
       const from = resolveAllowedFrom(body.from);
+
+      // Template variables for processing
+      const templateVars = {
+        name: name || "",
+        email: to || "",
+        url: url,
+      };
+
       const defaultHtml = `<div>
   <p>${name ? `${name} 様` : ""}</p>
   <p>イベントの入場用リンクです。こちらのリンクを当日入口でスタッフにお見せください。</p>
@@ -629,9 +699,30 @@ Deno.serve(async (req) => {
       const defaultText = `${
         name ? `${name} 様\n` : ""
       }イベントの入場用リンクです。当日入口でスタッフにお見せください。\nThis is your entry pass. Show this link at the entrance.\n${url}`;
-      const html = body.html || defaultHtml;
-      const text = body.text || defaultText;
-      const result = await sendViaResend({ to, subject, html, text, from });
+
+      // Process templates with variables
+      const html = processEmailTemplate(body.html || defaultHtml, templateVars);
+      const text = processEmailTemplate(body.text || defaultText, templateVars);
+
+      // Handle PDF attachment if provided
+      let attachments:
+        | Array<{ filename: string; content: string; content_type: string }>
+        | undefined;
+      if (body.pdfUrl) {
+        const pdfAttachment = await fetchPdfAttachment(body.pdfUrl);
+        if (pdfAttachment) {
+          attachments = [pdfAttachment];
+        }
+      }
+
+      const result = await sendViaResend({
+        to,
+        subject,
+        html,
+        text,
+        from,
+        attachments,
+      });
       return new Response(
         JSON.stringify({ ok: true, url, token, provider: "resend", result }),
         { headers: { "Content-Type": "application/json", ...corsHeaders } }
@@ -670,16 +761,46 @@ Deno.serve(async (req) => {
             continue;
           }
           const name = detectName(row.headers as any, row.data as any) || "";
-          const subject = "Your Entry Pass";
-          const html = `<div>
+          const subject = body.subject || "Your Entry Pass";
+
+          // Template variables for processing
+          const templateVars = {
+            name: name || "",
+            email: to || "",
+            url: url,
+          };
+
+          const defaultHtml = `<div>
   <p>${name ? `${name} 様` : ""}</p>
   <p>イベントの入場用リンクです。こちらのリンクを当日入口でスタッフにお見せください。</p>
   <p>This is your entry pass. Show this link at the entrance on event day.</p>
   <p><a href="${url}">${url}</a></p>
 </div>`;
-          const text = `${
+          const defaultText = `${
             name ? `${name} 様\n` : ""
           }イベントの入場用リンクです。当日入口でスタッフにお見せください。\nThis is your entry pass. Show this link at the entrance.\n${url}`;
+
+          // Process templates with variables
+          const html = processEmailTemplate(
+            body.html || defaultHtml,
+            templateVars
+          );
+          const text = processEmailTemplate(
+            body.text || defaultText,
+            templateVars
+          );
+
+          // Handle PDF attachment if provided (shared across all emails in bulk send)
+          let attachments:
+            | Array<{ filename: string; content: string; content_type: string }>
+            | undefined;
+          if (body.pdfUrl) {
+            const pdfAttachment = await fetchPdfAttachment(body.pdfUrl);
+            if (pdfAttachment) {
+              attachments = [pdfAttachment];
+            }
+          }
+
           try {
             const result = await sendViaResend({
               to,
@@ -687,6 +808,7 @@ Deno.serve(async (req) => {
               html,
               text,
               from,
+              attachments,
             });
             results.push({ row_hash: row.row_hash, sent: true, result });
           } catch (e: any) {
@@ -719,8 +841,8 @@ Deno.serve(async (req) => {
 
     // Don't expose internal errors in production
     const isProduction = Deno.env.get("DENO_DEPLOYMENT_ID");
-    const errorMessage = isProduction 
-      ? "An internal error occurred" 
+    const errorMessage = isProduction
+      ? "An internal error occurred"
       : err?.message ?? "Unknown error";
 
     // Determine appropriate status code
