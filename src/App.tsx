@@ -837,6 +837,15 @@ export default function App() {
     }
   });
 
+  // Receipt sending state
+  const [sendingReceiptHash, setSendingReceiptHash] = useState<string | null>(
+    null
+  );
+  const [sentReceipts, setSentReceipts] = useState<Set<string>>(new Set());
+
+  // Dropdown menu state for actions
+  const [openDropdownHash, setOpenDropdownHash] = useState<string | null>(null);
+
   // Entry pass email template state
   const [entryPassSubject, setEntryPassSubject] = useState<string>(() => {
     try {
@@ -889,6 +898,8 @@ This is your entry pass. Show this link at the entrance.
       return "";
     }
   });
+  const [entryPassPdfBase64, setEntryPassPdfBase64] = useState<string>("");
+  const [entryPassPdfName, setEntryPassPdfName] = useState<string>("");
   const [isBulkSendingPasses, setIsBulkSendingPasses] =
     useState<boolean>(false);
   const [entryPassTestRecipient, setEntryPassTestRecipient] = useState<string>(
@@ -1762,6 +1773,8 @@ This is your entry pass. Show this link at the entrance.
           html: entryPassHtml,
           text: entryPassText,
           pdfUrl: entryPassPdfUrl || undefined,
+          pdfBase64: entryPassPdfBase64 || undefined,
+          pdfName: entryPassPdfName || undefined,
         }),
       });
       if (!resp.ok) {
@@ -1780,6 +1793,82 @@ This is your entry pass. Show this link at the entrance.
       alert(e?.message || String(e));
     } finally {
       setSendingPassHash(null);
+    }
+  }
+
+  async function handleSendReceipt(row: {
+    row_number: number;
+    row_hash: string;
+    data: Record<string, any>;
+  }) {
+    try {
+      if (!userToken) {
+        alert("Please sign in first");
+        return;
+      }
+      setSendingReceiptHash(row.row_hash);
+
+      // TODO: Implement receipt PDF generation/fetching logic
+      // For now, this is a placeholder for the receipt sending functionality
+      // You'll need to:
+      // 1. Generate or fetch the PDF receipt for this participant
+      // 2. Send it via email using the send_payment_confirmation function or similar
+
+      const email = findEmailForRow(row.data);
+      const name = findNameForRow(row.data);
+
+      if (!email) {
+        throw new Error("No email found for this participant");
+      }
+
+      const resp = await fetch(
+        `${supabaseUrl}/functions/v1/send_payment_confirmation`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${userToken}`,
+          },
+          body: JSON.stringify({
+            action: "send_receipt",
+            row_hash: row.row_hash,
+            to: email,
+            name: name,
+            from: fromDisplay,
+            subject: "領収書 / Receipt",
+            html: `<div>
+  <p>${name ? `${name} 様` : ""}</p>
+  <p>お支払いの領収書をお送りします。</p>
+  <p>Please find your payment receipt attached.</p>
+  <p>ありがとうございます！</p>
+</div>`,
+            text: `${
+              name ? `${name} 様\n` : ""
+            }お支払いの領収書をお送りします。\nPlease find your payment receipt attached.\nありがとうございます！`,
+            // TODO: Add receipt PDF URL or base64 data here
+            // pdfUrl: `https://your-storage.com/receipts/${row.row_hash}.pdf`,
+            // or
+            // pdfBase64: "...",
+            // pdfName: `receipt_${row.row_hash}.pdf`
+          }),
+        }
+      );
+
+      if (!resp.ok) {
+        const txt = await resp.text();
+        throw new Error(`HTTP ${resp.status}: ${txt}`);
+      }
+
+      alert("領収書を送信しました / Receipt sent successfully!");
+      setSentReceipts((prev) => {
+        const next = new Set(prev);
+        next.add(row.row_hash);
+        return next;
+      });
+    } catch (e: any) {
+      alert(e?.message || String(e));
+    } finally {
+      setSendingReceiptHash(null);
     }
   }
 
@@ -1806,6 +1895,8 @@ This is your entry pass. Show this link at the entrance.
           html: entryPassHtml,
           text: entryPassText,
           pdfUrl: entryPassPdfUrl || undefined,
+          pdfBase64: entryPassPdfBase64 || undefined,
+          pdfName: entryPassPdfName || undefined,
         }),
       });
       if (!resp.ok) {
@@ -1864,6 +1955,8 @@ This is your entry pass. Show this link at the entrance.
           html: entryPassHtml,
           text: entryPassText,
           pdfUrl: entryPassPdfUrl || undefined,
+          pdfBase64: entryPassPdfBase64 || undefined,
+          pdfName: entryPassPdfName || undefined,
         }),
       });
       if (!resp.ok) {
@@ -2216,14 +2309,33 @@ This is your entry pass. Show this link at the entrance.
                       <input
                         type="file"
                         accept=".pdf"
-                        onChange={(e) => {
+                        onChange={async (e) => {
                           const file = e.target.files?.[0];
                           if (file && file.type === "application/pdf") {
                             setEntryPassPdf(file);
-                            // For demo purposes, we'll use a placeholder URL
-                            // In production, you'd upload this to your storage service
-                            const url = URL.createObjectURL(file);
-                            setEntryPassPdfUrl(url);
+                            setEntryPassPdfName(file.name);
+
+                            // Convert PDF to base64 for sending to backend
+                            try {
+                              const arrayBuffer = await file.arrayBuffer();
+                              const base64 = btoa(
+                                String.fromCharCode(
+                                  ...new Uint8Array(arrayBuffer)
+                                )
+                              );
+                              setEntryPassPdfBase64(base64);
+
+                              // Clear URL since we're using base64 now
+                              setEntryPassPdfUrl("");
+                            } catch (error) {
+                              console.error(
+                                "Error converting PDF to base64:",
+                                error
+                              );
+                              alert(
+                                "PDFファイルの処理中にエラーが発生しました"
+                              );
+                            }
                           } else {
                             alert("PDFファイルを選択してください");
                           }
@@ -2534,45 +2646,192 @@ This is your entry pass. Show this link at the entrance.
                                       </button>
                                     </div>
                                   ) : (
-                                    <div className="flex items-center gap-2">
+                                    <div className="relative">
                                       <button
                                         onClick={() =>
-                                          handleSendConfirmation(r)
+                                          setOpenDropdownHash(
+                                            openDropdownHash === r.row_hash
+                                              ? null
+                                              : r.row_hash
+                                          )
                                         }
-                                        disabled={
-                                          sendingConfirmHash === r.row_hash ||
-                                          sentConfirmations.has(r.row_hash)
-                                        }
-                                        className="rounded px-3 py-1 text-sm border text-blue-700 border-blue-300 bg-blue-50 hover:bg-blue-100 disabled:opacity-50"
+                                        className="rounded px-4 py-2 text-sm border text-indigo-700 border-indigo-300 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-300 flex items-center gap-2"
                                       >
-                                        {sentConfirmations.has(r.row_hash)
-                                          ? "確認メール送信済み"
-                                          : sendingConfirmHash === r.row_hash
-                                          ? "送信中…"
-                                          : "確認メールを送信"}
+                                        <span>操作</span>
+                                        <svg
+                                          className={`w-4 h-4 transition-transform ${
+                                            openDropdownHash === r.row_hash
+                                              ? "rotate-180"
+                                              : ""
+                                          }`}
+                                          fill="none"
+                                          stroke="currentColor"
+                                          viewBox="0 0 24 24"
+                                        >
+                                          <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M19 9l-7 7-7-7"
+                                          />
+                                        </svg>
                                       </button>
-                                      <button
-                                        onClick={() => handleSendEntryPass(r)}
-                                        disabled={
-                                          sendingPassHash === r.row_hash ||
-                                          sentPasses.has(r.row_hash)
-                                        }
-                                        className="rounded px-3 py-1 text-sm border text-purple-700 border-purple-300 bg-purple-50 hover:bg-purple-100 disabled:opacity-50"
-                                      >
-                                        {sentPasses.has(r.row_hash)
-                                          ? "入場パス送信済み"
-                                          : sendingPassHash === r.row_hash
-                                          ? "送信中…"
-                                          : "入場パスを送信"}
-                                      </button>
-                                      <button
-                                        onClick={() =>
-                                          setPendingUnmarkHash(r.row_hash)
-                                        }
-                                        className="rounded px-3 py-1 text-sm border text-red-700 border-red-300 bg-red-50 hover:bg-red-100"
-                                      >
-                                        支払い済みを解除
-                                      </button>
+
+                                      {openDropdownHash === r.row_hash && (
+                                        <>
+                                          {/* Backdrop to close dropdown when clicking outside */}
+                                          <div
+                                            className="fixed inset-0 z-10"
+                                            onClick={() =>
+                                              setOpenDropdownHash(null)
+                                            }
+                                          />
+                                          <div className="absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-20">
+                                            <div className="py-1">
+                                              {/* Send Confirmation Email */}
+                                              <button
+                                                onClick={() => {
+                                                  setOpenDropdownHash(null);
+                                                  handleSendConfirmation(r);
+                                                }}
+                                                disabled={
+                                                  sendingConfirmHash ===
+                                                    r.row_hash ||
+                                                  sentConfirmations.has(
+                                                    r.row_hash
+                                                  )
+                                                }
+                                                className="w-full text-left px-4 py-2 text-sm text-blue-700 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                              >
+                                                <svg
+                                                  className="w-4 h-4"
+                                                  fill="none"
+                                                  stroke="currentColor"
+                                                  viewBox="0 0 24 24"
+                                                >
+                                                  <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    strokeWidth={2}
+                                                    d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                                                  />
+                                                </svg>
+                                                <span>
+                                                  {sentConfirmations.has(
+                                                    r.row_hash
+                                                  )
+                                                    ? "✓ 確認メール送信済み"
+                                                    : sendingConfirmHash ===
+                                                      r.row_hash
+                                                    ? "送信中…"
+                                                    : "確認メールを送信"}
+                                                </span>
+                                              </button>
+
+                                              {/* Send Entry Pass */}
+                                              <button
+                                                onClick={() => {
+                                                  setOpenDropdownHash(null);
+                                                  handleSendEntryPass(r);
+                                                }}
+                                                disabled={
+                                                  sendingPassHash ===
+                                                    r.row_hash ||
+                                                  sentPasses.has(r.row_hash)
+                                                }
+                                                className="w-full text-left px-4 py-2 text-sm text-purple-700 hover:bg-purple-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                              >
+                                                <svg
+                                                  className="w-4 h-4"
+                                                  fill="none"
+                                                  stroke="currentColor"
+                                                  viewBox="0 0 24 24"
+                                                >
+                                                  <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    strokeWidth={2}
+                                                    d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"
+                                                  />
+                                                </svg>
+                                                <span>
+                                                  {sentPasses.has(r.row_hash)
+                                                    ? "✓ 入場パス送信済み"
+                                                    : sendingPassHash ===
+                                                      r.row_hash
+                                                    ? "送信中…"
+                                                    : "入場パスを送信"}
+                                                </span>
+                                              </button>
+
+                                              {/* Send Receipt */}
+                                              <button
+                                                onClick={() => {
+                                                  setOpenDropdownHash(null);
+                                                  handleSendReceipt(r);
+                                                }}
+                                                disabled={
+                                                  sendingReceiptHash ===
+                                                    r.row_hash ||
+                                                  sentReceipts.has(r.row_hash)
+                                                }
+                                                className="w-full text-left px-4 py-2 text-sm text-green-700 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                              >
+                                                <svg
+                                                  className="w-4 h-4"
+                                                  fill="none"
+                                                  stroke="currentColor"
+                                                  viewBox="0 0 24 24"
+                                                >
+                                                  <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    strokeWidth={2}
+                                                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                                  />
+                                                </svg>
+                                                <span>
+                                                  {sentReceipts.has(r.row_hash)
+                                                    ? "✓ 領収書送信済み"
+                                                    : sendingReceiptHash ===
+                                                      r.row_hash
+                                                    ? "送信中…"
+                                                    : "領収書を送信"}
+                                                </span>
+                                              </button>
+
+                                              {/* Divider */}
+                                              <div className="border-t border-gray-200 my-1" />
+
+                                              {/* Unmark as Paid */}
+                                              <button
+                                                onClick={() => {
+                                                  setOpenDropdownHash(null);
+                                                  setPendingUnmarkHash(
+                                                    r.row_hash
+                                                  );
+                                                }}
+                                                className="w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50 flex items-center gap-2"
+                                              >
+                                                <svg
+                                                  className="w-4 h-4"
+                                                  fill="none"
+                                                  stroke="currentColor"
+                                                  viewBox="0 0 24 24"
+                                                >
+                                                  <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    strokeWidth={2}
+                                                    d="M6 18L18 6M6 6l12 12"
+                                                  />
+                                                </svg>
+                                                <span>支払い済みを解除</span>
+                                              </button>
+                                            </div>
+                                          </div>
+                                        </>
+                                      )}
                                     </div>
                                   )}
                                 </td>
