@@ -845,6 +845,11 @@ export default function App() {
 
   // Dropdown menu state for actions
   const [openDropdownHash, setOpenDropdownHash] = useState<string | null>(null);
+  const [dropdownPosition, setDropdownPosition] = useState<{
+    top: number;
+    right: number;
+  } | null>(null);
+  const dropdownButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
 
   // Entry pass email template state
   const [entryPassSubject, setEntryPassSubject] = useState<string>(() => {
@@ -2604,7 +2609,7 @@ This is your entry pass. Show this link at the entrance.
                               <tr
                                 key={`paid-${r.row_hash}`}
                                 className="odd:bg-white even:bg-gray-50"
-                                style={{ position: 'relative' }}
+                                style={{ position: "relative" }}
                               >
                                 <td className="px-3 py-2 text-gray-700 whitespace-nowrap">
                                   {r.row_number}
@@ -2649,12 +2654,35 @@ This is your entry pass. Show this link at the entrance.
                                   ) : (
                                     <div className="relative">
                                       <button
+                                        ref={(el) => {
+                                          if (el) {
+                                            dropdownButtonRefs.current.set(
+                                              r.row_hash,
+                                              el
+                                            );
+                                          }
+                                        }}
                                         onClick={(e) => {
                                           e.stopPropagation();
+                                          const isOpening =
+                                            openDropdownHash !== r.row_hash;
+                                          if (isOpening) {
+                                            const button =
+                                              dropdownButtonRefs.current.get(
+                                                r.row_hash
+                                              );
+                                            if (button) {
+                                              const rect =
+                                                button.getBoundingClientRect();
+                                              setDropdownPosition({
+                                                top: rect.bottom + 8,
+                                                right:
+                                                  window.innerWidth - rect.right,
+                                              });
+                                            }
+                                          }
                                           setOpenDropdownHash(
-                                            openDropdownHash === r.row_hash
-                                              ? null
-                                              : r.row_hash
+                                            isOpening ? r.row_hash : null
                                           );
                                         }}
                                         className="rounded px-4 py-2 text-sm border text-indigo-700 border-indigo-300 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-300 flex items-center gap-2"
@@ -2679,21 +2707,30 @@ This is your entry pass. Show this link at the entrance.
                                         </svg>
                                       </button>
 
-                                      {openDropdownHash === r.row_hash && (
-                                        <>
-                                          {/* Backdrop to close dropdown when clicking outside */}
-                                          <div
-                                            className="fixed inset-0 z-10"
-                                            onClick={() =>
-                                              setOpenDropdownHash(null)
-                                            }
-                                          />
-                                          <div className="absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-20 max-h-96 overflow-y-auto">
+                                      {openDropdownHash === r.row_hash &&
+                                        dropdownPosition && (
+                                          <>
+                                            {/* Backdrop to close dropdown when clicking outside */}
+                                            <div
+                                              className="fixed inset-0 z-10"
+                                              onClick={() => {
+                                                setOpenDropdownHash(null);
+                                                setDropdownPosition(null);
+                                              }}
+                                            />
+                                            <div
+                                              className="fixed w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-20 max-h-96 overflow-y-auto"
+                                              style={{
+                                                top: `${dropdownPosition.top}px`,
+                                                right: `${dropdownPosition.right}px`,
+                                              }}
+                                            >
                                             <div className="py-1">
                                               {/* Send Confirmation Email */}
                                               <button
                                                 onClick={() => {
                                                   setOpenDropdownHash(null);
+                                                  setDropdownPosition(null);
                                                   handleSendConfirmation(r);
                                                 }}
                                                 disabled={
@@ -2734,6 +2771,7 @@ This is your entry pass. Show this link at the entrance.
                                               <button
                                                 onClick={() => {
                                                   setOpenDropdownHash(null);
+                                                  setDropdownPosition(null);
                                                   handleSendEntryPass(r);
                                                 }}
                                                 disabled={
@@ -2770,6 +2808,7 @@ This is your entry pass. Show this link at the entrance.
                                               <button
                                                 onClick={() => {
                                                   setOpenDropdownHash(null);
+                                                  setDropdownPosition(null);
                                                   handleSendReceipt(r);
                                                 }}
                                                 disabled={
@@ -2809,6 +2848,7 @@ This is your entry pass. Show this link at the entrance.
                                               <button
                                                 onClick={() => {
                                                   setOpenDropdownHash(null);
+                                                  setDropdownPosition(null);
                                                   setPendingUnmarkHash(
                                                     r.row_hash
                                                   );
