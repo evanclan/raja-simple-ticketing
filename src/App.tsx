@@ -2569,7 +2569,7 @@ This is your entry pass. Show this link at the entrance.
                         </button>
                       </div>
                     </div>
-                    <div className="table-scroll overflow-auto border rounded">
+                    <div className="table-scroll overflow-x-auto border rounded">
                       <table className="min-w-full text-sm">
                         <thead className="bg-red-50/60 border-b border-red-100">
                           <tr>
@@ -2604,6 +2604,7 @@ This is your entry pass. Show this link at the entrance.
                               <tr
                                 key={`paid-${r.row_hash}`}
                                 className="odd:bg-white even:bg-gray-50"
+                                style={{ position: 'relative' }}
                               >
                                 <td className="px-3 py-2 text-gray-700 whitespace-nowrap">
                                   {r.row_number}
@@ -2618,7 +2619,7 @@ This is your entry pass. Show this link at the entrance.
                                     )}
                                   </td>
                                 ))}
-                                <td className="px-3 py-2 text-gray-800 whitespace-nowrap">
+                                <td className="px-3 py-2 text-gray-800 whitespace-nowrap overflow-visible">
                                   {processingUnmarkHash === r.row_hash ? (
                                     <button
                                       disabled
@@ -2648,13 +2649,14 @@ This is your entry pass. Show this link at the entrance.
                                   ) : (
                                     <div className="relative">
                                       <button
-                                        onClick={() =>
+                                        onClick={(e) => {
+                                          e.stopPropagation();
                                           setOpenDropdownHash(
                                             openDropdownHash === r.row_hash
                                               ? null
                                               : r.row_hash
-                                          )
-                                        }
+                                          );
+                                        }}
                                         className="rounded px-4 py-2 text-sm border text-indigo-700 border-indigo-300 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-300 flex items-center gap-2"
                                       >
                                         <span>操作</span>
@@ -2686,7 +2688,7 @@ This is your entry pass. Show this link at the entrance.
                                               setOpenDropdownHash(null)
                                             }
                                           />
-                                          <div className="absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-20">
+                                          <div className="absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-20 max-h-96 overflow-y-auto">
                                             <div className="py-1">
                                               {/* Send Confirmation Email */}
                                               <button
