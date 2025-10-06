@@ -808,13 +808,15 @@ export default function App() {
   );
   const [htmlTemplate, setHtmlTemplate] = useState<string>(
     `<div>
-  <p>{{name}}</p>
+  <p>{{name}} 様</p>
   <p>お支払いを確認しました。ありがとうございます！</p>
-  <p>This is a confirmation that we received your payment. Thank you.</p>
+  <p>領収書を添付しております。ご確認ください。</p>
+  <p>This is a confirmation that we received your payment. Thank you!</p>
+  <p>Please find your receipt attached to this email.</p>
 </div>`
   );
   const [textTemplate, setTextTemplate] = useState<string>(
-    `{{name}}\nお支払いを確認しました。ありがとうございます！\nThis is a confirmation that we received your payment. Thank you.`
+    `{{name}} 様\nお支払いを確認しました。ありがとうございます！\n領収書を添付しております。ご確認ください。\n\nThis is a confirmation that we received your payment. Thank you!\nPlease find your receipt attached to this email.`
   );
   const htmlRef = useRef<HTMLTextAreaElement | null>(null);
   const textRef = useRef<HTMLTextAreaElement | null>(null);
