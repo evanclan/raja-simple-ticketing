@@ -838,13 +838,20 @@ export default function App() {
   });
 
   // Receipt upload state - stores uploaded PDF receipts per participant
-  const [uploadingReceiptHash, setUploadingReceiptHash] = useState<string | null>(
-    null
-  );
-  const [uploadedReceipts, setUploadedReceipts] = useState<Map<string, { fileName: string; fileData: string }>>(new Map());
+  const [uploadingReceiptHash, setUploadingReceiptHash] = useState<
+    string | null
+  >(null);
+  const [uploadedReceipts, setUploadedReceipts] = useState<
+    Map<string, { fileName: string; fileData: string }>
+  >(new Map());
 
   // Dropdown menu state for actions
   const [openDropdownHash, setOpenDropdownHash] = useState<string | null>(null);
+  const [dropdownPosition, setDropdownPosition] = useState<{
+    top: number;
+    right: number;
+  } | null>(null);
+  const dropdownButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
 
   // Entry pass email template state
   const [entryPassSubject, setEntryPassSubject] = useState<string>(() => {
@@ -1675,19 +1682,25 @@ This is your entry pass. Show this link at the entrance.
         alert("No email found in this row.");
         return;
       }
-      
+
       // Check if receipt is uploaded
       const receipt = uploadedReceipts.get(row.row_hash);
       if (!receipt) {
-        alert("領収書必要です\n\nReceipt is required!\n\nPlease upload the receipt PDF first before sending confirmation email.");
+        alert(
+          "領収書必要です\n\nReceipt is required!\n\nPlease upload the receipt PDF first before sending confirmation email."
+        );
         return;
       }
-      
+
       const name = findNameForRow(row.data) || "";
-      if (!confirm(`確認メールを送信しますか？\n\nSend confirmation email with receipt to:\n${name} (${email})\n\nReceipt: ${receipt.fileName}`)) {
+      if (
+        !confirm(
+          `確認メールを送信しますか？\n\nSend confirmation email with receipt to:\n${name} (${email})\n\nReceipt: ${receipt.fileName}`
+        )
+      ) {
         return;
       }
-      
+
       setSendingConfirmHash(row.row_hash);
 
       // derive values for variables
@@ -1820,51 +1833,59 @@ This is your entry pass. Show this link at the entrance.
     const input = document.createElement("input");
     input.type = "file";
     input.accept = "application/pdf,.pdf";
-    
+
     input.onchange = async (e: Event) => {
       const target = e.target as HTMLInputElement;
       const file = target.files?.[0];
-      
+
       if (!file) return;
-      
+
       // Check if it's a PDF
       if (file.type !== "application/pdf") {
-        alert("PDFファイルのみアップロードできます。\nOnly PDF files are allowed.");
+        alert(
+          "PDFファイルのみアップロードできます。\nOnly PDF files are allowed."
+        );
         return;
       }
-      
+
       const name = findNameForRow(row.data) || "";
       const email = findEmailForRow(row.data) || "";
-      
-      if (!confirm(`領収書をアップロードしますか？\n\nUpload receipt for:\n${name} (${email})\n\nFile: ${file.name}`)) {
+
+      if (
+        !confirm(
+          `領収書をアップロードしますか？\n\nUpload receipt for:\n${name} (${email})\n\nFile: ${file.name}`
+        )
+      ) {
         return;
       }
-      
+
       try {
         setUploadingReceiptHash(row.row_hash);
-        
+
         // Convert file to base64
         const reader = new FileReader();
         reader.onload = async () => {
           const base64Data = reader.result as string;
-          
+
           // Store in state (this will be used when sending confirmation email)
           setUploadedReceipts((prev) => {
             const next = new Map(prev);
             next.set(row.row_hash, {
               fileName: file.name,
-              fileData: base64Data
+              fileData: base64Data,
             });
             return next;
           });
-          
-          alert(`✓ 領収書がアップロードされました！\n✓ Receipt uploaded successfully!\n\nFile: ${file.name}\n\nYou can now send the confirmation email with this receipt attached.`);
+
+          alert(
+            `✓ 領収書がアップロードされました！\n✓ Receipt uploaded successfully!\n\nFile: ${file.name}\n\nYou can now send the confirmation email with this receipt attached.`
+          );
         };
-        
+
         reader.onerror = () => {
           throw new Error("Failed to read file");
         };
-        
+
         reader.readAsDataURL(file);
       } catch (e: any) {
         alert(e?.message || String(e));
@@ -1872,7 +1893,7 @@ This is your entry pass. Show this link at the entrance.
         setUploadingReceiptHash(null);
       }
     };
-    
+
     input.click();
   }
 
@@ -2652,13 +2673,37 @@ This is your entry pass. Show this link at the entrance.
                                   ) : (
                                     <div className="relative">
                                       <button
-                                        onClick={() =>
+                                        ref={(el) => {
+                                          if (el) {
+                                            dropdownButtonRefs.current.set(
+                                              r.row_hash,
+                                              el
+                                            );
+                                          }
+                                        }}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const isOpening =
+                                            openDropdownHash !== r.row_hash;
+                                          if (isOpening) {
+                                            const button =
+                                              dropdownButtonRefs.current.get(
+                                                r.row_hash
+                                              );
+                                            if (button) {
+                                              const rect =
+                                                button.getBoundingClientRect();
+                                              setDropdownPosition({
+                                                top: rect.bottom + 8,
+                                                right:
+                                                  window.innerWidth - rect.right,
+                                              });
+                                            }
+                                          }
                                           setOpenDropdownHash(
-                                            openDropdownHash === r.row_hash
-                                              ? null
-                                              : r.row_hash
-                                          )
-                                        }
+                                            isOpening ? r.row_hash : null
+                                          );
+                                        }}
                                         className="rounded px-4 py-2 text-sm border text-indigo-700 border-indigo-300 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-300 flex items-center gap-2"
                                       >
                                         <span>操作</span>
@@ -2681,21 +2726,30 @@ This is your entry pass. Show this link at the entrance.
                                         </svg>
                                       </button>
 
-                                      {openDropdownHash === r.row_hash && (
-                                        <>
-                                          {/* Backdrop to close dropdown when clicking outside */}
-                                          <div
-                                            className="fixed inset-0 z-10"
-                                            onClick={() =>
-                                              setOpenDropdownHash(null)
-                                            }
-                                          />
-                                          <div className="absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-20">
+                                      {openDropdownHash === r.row_hash &&
+                                        dropdownPosition && (
+                                          <>
+                                            {/* Backdrop to close dropdown when clicking outside */}
+                                            <div
+                                              className="fixed inset-0 z-10"
+                                              onClick={() => {
+                                                setOpenDropdownHash(null);
+                                                setDropdownPosition(null);
+                                              }}
+                                            />
+                                            <div
+                                              className="fixed w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-20 max-h-96 overflow-y-auto"
+                                              style={{
+                                                top: `${dropdownPosition.top}px`,
+                                                right: `${dropdownPosition.right}px`,
+                                              }}
+                                            >
                                             <div className="py-1">
                                               {/* Send Confirmation Email */}
                                               <button
                                                 onClick={() => {
                                                   setOpenDropdownHash(null);
+                                                  setDropdownPosition(null);
                                                   handleSendConfirmation(r);
                                                 }}
                                                 disabled={
@@ -2728,7 +2782,9 @@ This is your entry pass. Show this link at the entrance.
                                                     : sendingConfirmHash ===
                                                       r.row_hash
                                                     ? "送信中…"
-                                                    : uploadedReceipts.has(r.row_hash)
+                                                    : uploadedReceipts.has(
+                                                        r.row_hash
+                                                      )
                                                     ? "確認メールを送信"
                                                     : "確認メールを送信 (⚠️ 領収書必要)"}
                                                 </span>
@@ -2738,6 +2794,7 @@ This is your entry pass. Show this link at the entrance.
                                               <button
                                                 onClick={() => {
                                                   setOpenDropdownHash(null);
+                                                  setDropdownPosition(null);
                                                   handleSendEntryPass(r);
                                                 }}
                                                 disabled={
@@ -2774,11 +2831,12 @@ This is your entry pass. Show this link at the entrance.
                                               <button
                                                 onClick={() => {
                                                   setOpenDropdownHash(null);
+                                                  setDropdownPosition(null);
                                                   handleUploadReceipt(r);
                                                 }}
                                                 disabled={
                                                   uploadingReceiptHash ===
-                                                    r.row_hash
+                                                  r.row_hash
                                                 }
                                                 className="w-full text-left px-4 py-2 text-sm text-green-700 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                                               >
@@ -2799,7 +2857,11 @@ This is your entry pass. Show this link at the entrance.
                                                   {uploadedReceipts.has(
                                                     r.row_hash
                                                   )
-                                                    ? `✓ ${uploadedReceipts.get(r.row_hash)?.fileName || "領収書"}`
+                                                    ? `✓ ${
+                                                        uploadedReceipts.get(
+                                                          r.row_hash
+                                                        )?.fileName || "領収書"
+                                                      }`
                                                     : uploadingReceiptHash ===
                                                       r.row_hash
                                                     ? "アップロード中…"
@@ -2814,6 +2876,7 @@ This is your entry pass. Show this link at the entrance.
                                               <button
                                                 onClick={() => {
                                                   setOpenDropdownHash(null);
+                                                  setDropdownPosition(null);
                                                   setPendingUnmarkHash(
                                                     r.row_hash
                                                   );
