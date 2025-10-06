@@ -9,6 +9,8 @@ type SendRequest = {
   text?: string;
   name?: string;
   from?: string;
+  pdfBase64?: string; // Base64 encoded PDF with data URI prefix
+  pdfName?: string; // Filename for the PDF attachment
 };
 
 function getCorsHeaders(origin: string | null): Record<string, string> {
@@ -89,22 +91,33 @@ async function sendViaResend({
   html,
   text,
   from,
+  attachments,
 }: {
   to: string;
   subject: string;
   html: string;
   text: string;
   from: string;
+  attachments?: Array<{
+    filename: string;
+    content: string;
+  }>;
 }) {
   const apiKey = Deno.env.get("RESEND_API_KEY");
   if (!apiKey) throw new Error("Missing RESEND_API_KEY env var");
+  
+  const emailPayload: any = { from, to, subject, html, text };
+  if (attachments && attachments.length > 0) {
+    emailPayload.attachments = attachments;
+  }
+  
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
     },
-    body: JSON.stringify({ from, to, subject, html, text }),
+    body: JSON.stringify(emailPayload),
   });
   if (!res.ok) {
     const err = await res.text();
@@ -141,7 +154,24 @@ Deno.serve(async (req) => {
       Deno.env.get("EMAIL_FROM") ||
       "no-reply@example.com";
 
-    const result = await sendViaResend({ to, subject, html, text, from });
+    // Handle PDF attachment if provided
+    let attachments:
+      | Array<{ filename: string; content: string }>
+      | undefined;
+    
+    if (body.pdfBase64 && body.pdfName) {
+      // Extract base64 content from data URI (e.g., "data:application/pdf;base64,...")
+      const base64Content = body.pdfBase64.includes(',') 
+        ? body.pdfBase64.split(',')[1] 
+        : body.pdfBase64;
+      
+      attachments = [{
+        filename: body.pdfName,
+        content: base64Content,
+      }];
+    }
+
+    const result = await sendViaResend({ to, subject, html, text, from, attachments });
 
     return new Response(
       JSON.stringify({ ok: true, provider: "resend", result }),
