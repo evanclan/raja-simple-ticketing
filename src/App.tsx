@@ -1713,11 +1713,14 @@ This is your entry pass. Show this link at the entrance.
       }
 
       const name = findNameForRow(row.data) || "";
-      if (
-        !confirm(
-          `確認メールを送信しますか？\n\nSend confirmation email with receipt to:\n${name} (${email})\n\nReceipt: ${receipt.fileName}`
-        )
-      ) {
+      
+      // Check if already sent
+      const alreadySent = sentConfirmations.has(row.row_hash);
+      const confirmMessage = alreadySent
+        ? `このユーザーには既に確認メールを送信済みです。\n再送信しますか？\n\nThis user has already received a confirmation email.\nResend confirmation email with receipt to:\n${name} (${email})\n\nReceipt: ${receipt.fileName}`
+        : `確認メールを送信しますか？\n\nSend confirmation email with receipt to:\n${name} (${email})\n\nReceipt: ${receipt.fileName}`;
+      
+      if (!confirm(confirmMessage)) {
         return;
       }
 
@@ -1801,6 +1804,17 @@ This is your entry pass. Show this link at the entrance.
         alert("Please sign in first");
         return;
       }
+      // Check if already sent
+      const email = findEmailForRow(row.data);
+      const name = findNameForRow(row.data) || "";
+      const alreadySent = sentPasses.has(row.row_hash);
+      
+      if (alreadySent) {
+        if (!confirm(`このユーザーには既に入場パスを送信済みです。\n再送信しますか？\n\nThis user has already received an entry pass.\nResend entry pass to:\n${name} (${email})?`)) {
+          return;
+        }
+      }
+      
       setSendingPassHash(row.row_hash);
       const baseUrl = window.location.origin;
 
@@ -2776,10 +2790,7 @@ This is your entry pass. Show this link at the entrance.
                                                   }}
                                                   disabled={
                                                     sendingConfirmHash ===
-                                                      r.row_hash ||
-                                                    sentConfirmations.has(
                                                       r.row_hash
-                                                    )
                                                   }
                                                   className="w-full text-left px-4 py-2 text-sm text-blue-700 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                                                 >
@@ -2821,8 +2832,7 @@ This is your entry pass. Show this link at the entrance.
                                                   }}
                                                   disabled={
                                                     sendingPassHash ===
-                                                      r.row_hash ||
-                                                    sentPasses.has(r.row_hash)
+                                                      r.row_hash
                                                   }
                                                   className="w-full text-left px-4 py-2 text-sm text-purple-700 hover:bg-purple-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                                                 >
