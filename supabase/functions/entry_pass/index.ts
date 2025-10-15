@@ -29,6 +29,8 @@ type ActionRequest =
       text?: string;
       from?: string;
       pdfUrl?: string;
+      pdfBase64?: string;
+      pdfName?: string;
     }
   | {
       action: "bulk_send";
@@ -38,6 +40,8 @@ type ActionRequest =
       html?: string;
       text?: string;
       pdfUrl?: string;
+      pdfBase64?: string;
+      pdfName?: string;
     };
 
 // Rate limiting storage
@@ -349,18 +353,29 @@ async function sendViaResend(params: {
   attachments?: Array<{
     filename: string;
     content: string;
-    content_type: string;
   }>;
 }) {
   const apiKey = Deno.env.get("RESEND_API_KEY");
   if (!apiKey) throw new Error("Missing RESEND_API_KEY env var");
+
+  const emailPayload: any = {
+    from: params.from,
+    to: params.to,
+    subject: params.subject,
+    html: params.html,
+    text: params.text,
+  };
+  if (params.attachments && params.attachments.length > 0) {
+    emailPayload.attachments = params.attachments;
+  }
+
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
     },
-    body: JSON.stringify(params),
+    body: JSON.stringify(emailPayload),
   });
   if (!res.ok) {
     const err = await res.text();
@@ -373,7 +388,6 @@ async function sendViaResend(params: {
 async function fetchPdfAttachment(pdfUrl: string): Promise<{
   filename: string;
   content: string;
-  content_type: string;
 } | null> {
   try {
     if (!pdfUrl || !validateUrl(pdfUrl)) return null;
@@ -396,7 +410,6 @@ async function fetchPdfAttachment(pdfUrl: string): Promise<{
     return {
       filename: filename.endsWith(".pdf") ? filename : `${filename}.pdf`,
       content: base64Content,
-      content_type: "application/pdf",
     };
   } catch (error) {
     secureLog("Error fetching PDF attachment", { error: error.message });
@@ -705,10 +718,22 @@ Deno.serve(async (req) => {
       const text = processEmailTemplate(body.text || defaultText, templateVars);
 
       // Handle PDF attachment if provided
-      let attachments:
-        | Array<{ filename: string; content: string; content_type: string }>
-        | undefined;
-      if (body.pdfUrl) {
+      let attachments: Array<{ filename: string; content: string }> | undefined;
+
+      if (body.pdfBase64 && body.pdfName) {
+        // Handle base64 PDF attachment
+        const base64Content = body.pdfBase64.includes(",")
+          ? body.pdfBase64.split(",")[1]
+          : body.pdfBase64;
+
+        attachments = [
+          {
+            filename: body.pdfName,
+            content: base64Content,
+          },
+        ];
+      } else if (body.pdfUrl) {
+        // Handle URL-based PDF attachment
         const pdfAttachment = await fetchPdfAttachment(body.pdfUrl);
         if (pdfAttachment) {
           attachments = [pdfAttachment];
@@ -761,7 +786,7 @@ Deno.serve(async (req) => {
             continue;
           }
           const name = detectName(row.headers as any, row.data as any) || "";
-          const subject = body.subject || "Your Entry Pass";
+          const subject = (body as any).subject || "Your Entry Pass";
 
           // Template variables for processing
           const templateVars = {
@@ -782,20 +807,36 @@ Deno.serve(async (req) => {
 
           // Process templates with variables
           const html = processEmailTemplate(
-            body.html || defaultHtml,
+            (body as any).html || defaultHtml,
             templateVars
           );
           const text = processEmailTemplate(
-            body.text || defaultText,
+            (body as any).text || defaultText,
             templateVars
           );
 
           // Handle PDF attachment if provided (shared across all emails in bulk send)
           let attachments:
-            | Array<{ filename: string; content: string; content_type: string }>
+            | Array<{ filename: string; content: string }>
             | undefined;
-          if (body.pdfUrl) {
-            const pdfAttachment = await fetchPdfAttachment(body.pdfUrl);
+
+          if ((body as any).pdfBase64 && (body as any).pdfName) {
+            // Handle base64 PDF attachment
+            const base64Content = (body as any).pdfBase64.includes(",")
+              ? (body as any).pdfBase64.split(",")[1]
+              : (body as any).pdfBase64;
+
+            attachments = [
+              {
+                filename: (body as any).pdfName,
+                content: base64Content,
+              },
+            ];
+          } else if ((body as any).pdfUrl) {
+            // Handle URL-based PDF attachment
+            const pdfAttachment = await fetchPdfAttachment(
+              (body as any).pdfUrl
+            );
             if (pdfAttachment) {
               attachments = [pdfAttachment];
             }

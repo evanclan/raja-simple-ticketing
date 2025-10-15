@@ -105,12 +105,12 @@ async function sendViaResend({
 }) {
   const apiKey = Deno.env.get("RESEND_API_KEY");
   if (!apiKey) throw new Error("Missing RESEND_API_KEY env var");
-  
+
   const emailPayload: any = { from, to, subject, html, text };
   if (attachments && attachments.length > 0) {
     emailPayload.attachments = attachments;
   }
-  
+
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
@@ -155,23 +155,30 @@ Deno.serve(async (req) => {
       "no-reply@example.com";
 
     // Handle PDF attachment if provided
-    let attachments:
-      | Array<{ filename: string; content: string }>
-      | undefined;
-    
+    let attachments: Array<{ filename: string; content: string }> | undefined;
+
     if (body.pdfBase64 && body.pdfName) {
       // Extract base64 content from data URI (e.g., "data:application/pdf;base64,...")
-      const base64Content = body.pdfBase64.includes(',') 
-        ? body.pdfBase64.split(',')[1] 
+      const base64Content = body.pdfBase64.includes(",")
+        ? body.pdfBase64.split(",")[1]
         : body.pdfBase64;
-      
-      attachments = [{
-        filename: body.pdfName,
-        content: base64Content,
-      }];
+
+      attachments = [
+        {
+          filename: body.pdfName,
+          content: base64Content,
+        },
+      ];
     }
 
-    const result = await sendViaResend({ to, subject, html, text, from, attachments });
+    const result = await sendViaResend({
+      to,
+      subject,
+      html,
+      text,
+      from,
+      attachments,
+    });
 
     return new Response(
       JSON.stringify({ ok: true, provider: "resend", result }),
