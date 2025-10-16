@@ -779,6 +779,7 @@ export default function App() {
   const pageSize = 25;
   const [hasMore, setHasMore] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [simpleMode, setSimpleMode] = useState<boolean>(true); // Toggle for hiding columns
 
   // Paid participants view state
   const [paidHeaders, setPaidHeaders] = useState<string[]>([]);
@@ -1034,6 +1035,31 @@ This is your entry pass. Show this link at the entrance.
     }
   }, []);
 
+  // Auto-save email templates whenever they change
+  useEffect(() => {
+    // Skip on initial mount (templates are loaded from localStorage above)
+    const timer = setTimeout(() => {
+      localStorage.setItem("email_tpl_subject", subjectTemplate);
+      localStorage.setItem("email_tpl_html", htmlTemplate);
+      localStorage.setItem("email_tpl_text", textTemplate);
+      localStorage.setItem("email_tpl_from", fromDisplay);
+    }, 500); // Debounce by 500ms to avoid saving on every keystroke
+
+    return () => clearTimeout(timer);
+  }, [subjectTemplate, htmlTemplate, textTemplate, fromDisplay]);
+
+  // Auto-save entry pass templates whenever they change
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      localStorage.setItem("entry_pass_subject", entryPassSubject);
+      localStorage.setItem("entry_pass_html", entryPassHtml);
+      localStorage.setItem("entry_pass_text", entryPassText);
+      localStorage.setItem("entry_pass_pdf_url", entryPassPdfUrl);
+    }, 500); // Debounce by 500ms to avoid saving on every keystroke
+
+    return () => clearTimeout(timer);
+  }, [entryPassSubject, entryPassHtml, entryPassText, entryPassPdfUrl]);
+
   useEffect(() => {
     if (!isSupabaseConfigured) return;
     (async () => {
@@ -1160,6 +1186,21 @@ This is your entry pass. Show this link at the entrance.
       return false;
     });
   }, [rows, tableHeaders, searchQuery]);
+
+  // Filter headers based on simple mode toggle
+  const displayHeaders = useMemo(() => {
+    if (!simpleMode) return tableHeaders;
+
+    // Find the indices of the columns to hide
+    const startIdx = tableHeaders.findIndex((h) => h === "フリガナ");
+    const endIdx = tableHeaders.findIndex((h) => h === "園児（利用者）氏名");
+
+    // If either column is not found, return all headers
+    if (startIdx === -1 || endIdx === -1) return tableHeaders;
+
+    // Filter out columns from startIdx to endIdx (inclusive)
+    return tableHeaders.filter((_, idx) => idx < startIdx || idx > endIdx);
+  }, [tableHeaders, simpleMode]);
 
   // Attempt to auto-detect adult/child header keys from current headers
   useEffect(() => {
@@ -1336,7 +1377,9 @@ This is your entry pass. Show this link at the entrance.
     localStorage.setItem("sent_entry_passes", JSON.stringify(Array.from(next)));
   }
 
-  function persistUploadedReceipts(receipts: Map<string, { fileName: string; fileData: string }>) {
+  function persistUploadedReceipts(
+    receipts: Map<string, { fileName: string; fileData: string }>
+  ) {
     try {
       const obj = Object.fromEntries(receipts);
       localStorage.setItem("uploaded_receipts", JSON.stringify(obj));
@@ -1715,13 +1758,13 @@ This is your entry pass. Show this link at the entrance.
       }
 
       const name = findNameForRow(row.data) || "";
-      
+
       // Check if already sent
       const alreadySent = sentConfirmations.has(row.row_hash);
       const confirmMessage = alreadySent
         ? `このユーザーには既に確認メールを送信済みです。\n再送信しますか？\n\nThis user has already received a confirmation email.\nResend confirmation email with receipt to:\n${name} (${email})\n\nReceipt: ${receipt.fileName}`
         : `確認メールを送信しますか？\n\nSend confirmation email with receipt to:\n${name} (${email})\n\nReceipt: ${receipt.fileName}`;
-      
+
       if (!confirm(confirmMessage)) {
         return;
       }
@@ -1810,13 +1853,17 @@ This is your entry pass. Show this link at the entrance.
       const email = findEmailForRow(row.data);
       const name = findNameForRow(row.data) || "";
       const alreadySent = sentPasses.has(row.row_hash);
-      
+
       if (alreadySent) {
-        if (!confirm(`このユーザーには既に入場パスを送信済みです。\n再送信しますか？\n\nThis user has already received an entry pass.\nResend entry pass to:\n${name} (${email})?`)) {
+        if (
+          !confirm(
+            `このユーザーには既に入場パスを送信済みです。\n再送信しますか？\n\nThis user has already received an entry pass.\nResend entry pass to:\n${name} (${email})?`
+          )
+        ) {
           return;
         }
       }
-      
+
       setSendingPassHash(row.row_hash);
       const baseUrl = window.location.origin;
 
@@ -2273,16 +2320,10 @@ This is your entry pass. Show this link at the entrance.
                       </button>
                     ))}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => {
-                        persistTemplates();
-                        alert("Saved.");
-                      }}
-                      className="rounded bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700"
-                    >
-                      保存
-                    </button>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-gray-500 italic">
+                      ✓ 自動保存有効 (Auto-save enabled)
+                    </span>
                     <button
                       onClick={() => {
                         setSubjectTemplate("Payment confirmation");
@@ -2457,16 +2498,10 @@ This is your entry pass. Show this link at the entrance.
                       </button>
                     ))}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => {
-                        persistEntryPassTemplates();
-                        alert("Saved.");
-                      }}
-                      className="rounded bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700"
-                    >
-                      保存
-                    </button>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-gray-500 italic">
+                      ✓ 自動保存有効 (Auto-save enabled)
+                    </span>
                     <button
                       onClick={() => {
                         setEntryPassSubject("Your Entry Pass");
@@ -2515,6 +2550,16 @@ This is your entry pass. Show this link at the entrance.
                   <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <h3 className="font-medium">Latest imported rows</h3>
                     <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setSimpleMode(!simpleMode)}
+                        className={`rounded border px-3 py-1 text-sm whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-300 ${
+                          simpleMode
+                            ? "text-white bg-indigo-600 border-indigo-600 hover:bg-indigo-700"
+                            : "text-indigo-700 border-indigo-300 bg-white hover:bg-indigo-50"
+                        }`}
+                      >
+                        簡単モード
+                      </button>
                       <input
                         type="text"
                         value={searchQuery}
@@ -2546,7 +2591,7 @@ This is your entry pass. Show this link at the entrance.
                           <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
                             #
                           </th>
-                          {tableHeaders.map((h, idx) => (
+                          {displayHeaders.map((h, idx) => (
                             <th
                               key={`${h || ""}-${idx}`}
                               className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap"
@@ -2563,7 +2608,7 @@ This is your entry pass. Show this link at the entrance.
                         {filteredRows.length === 0 ? (
                           <tr>
                             <td
-                              colSpan={2 + tableHeaders.length}
+                              colSpan={2 + displayHeaders.length}
                               className="px-3 py-4 text-center text-gray-500"
                             >
                               データがありません
@@ -2578,7 +2623,7 @@ This is your entry pass. Show this link at the entrance.
                               <td className="px-3 py-2 text-gray-700 whitespace-nowrap">
                                 {r.row_number}
                               </td>
-                              {tableHeaders.map((h, idx) => (
+                              {displayHeaders.map((h, idx) => (
                                 <td
                                   key={`${r.row_number}-${idx}`}
                                   className="px-3 py-2 text-gray-800 whitespace-nowrap"
@@ -2792,7 +2837,7 @@ This is your entry pass. Show this link at the entrance.
                                                   }}
                                                   disabled={
                                                     sendingConfirmHash ===
-                                                      r.row_hash
+                                                    r.row_hash
                                                   }
                                                   className="w-full text-left px-4 py-2 text-sm text-blue-700 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                                                 >
@@ -2834,7 +2879,7 @@ This is your entry pass. Show this link at the entrance.
                                                   }}
                                                   disabled={
                                                     sendingPassHash ===
-                                                      r.row_hash
+                                                    r.row_hash
                                                   }
                                                   className="w-full text-left px-4 py-2 text-sm text-purple-700 hover:bg-purple-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                                                 >
