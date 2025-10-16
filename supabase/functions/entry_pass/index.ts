@@ -330,8 +330,32 @@ function resolveAllowedFrom(requested?: string): string {
   // If no allowed senders configured, allow any sender
   if (allowed.length === 0) return req;
 
-  // Check if requested sender is in allowed list
+  // Check if requested sender is in allowed list (exact match)
   if (allowed.includes(req)) return req;
+
+  // Extract domain from requested sender and check if it matches any allowed domain
+  const extractDomain = (sender: string): string => {
+    const match =
+      sender.match(/<([^>]+)>/) || sender.match(/([^\s<>]+@[^\s<>]+)/);
+    if (match) {
+      const email = match[1] || match[0];
+      const domainMatch = email.match(/@(.+)$/);
+      return domainMatch ? domainMatch[1] : "";
+    }
+    return "";
+  };
+
+  const requestedDomain = extractDomain(req);
+  if (requestedDomain) {
+    // Check if any allowed sender uses the same domain
+    for (const allowedSender of allowed) {
+      const allowedDomain = extractDomain(allowedSender);
+      if (allowedDomain && requestedDomain === allowedDomain) {
+        secureLog(`Allowing sender with matching domain: ${requestedDomain}`);
+        return req;
+      }
+    }
+  }
 
   // More detailed error message for debugging
   console.error(
