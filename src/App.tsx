@@ -2033,7 +2033,7 @@ This is your entry pass. Show this link at the entrance.
         ).toLocaleString();
         if (
           !confirm(
-            `この参加者は既にチェックイン済みです。\nThis participant is already checked in.\n\nChecked in at: ${checkedInTime}\n\nCheck in again?`
+            `⚠️ 警告 / WARNING ⚠️\n\nこの参加者は既にチェックイン済みです。\nThis participant is already checked in.\n\nChecked in at: ${checkedInTime}\n\n再度チェックインしますか？\nCheck in again?`
           )
         ) {
           return;
@@ -2041,7 +2041,7 @@ This is your entry pass. Show this link at the entrance.
       } else {
         if (
           !confirm(
-            `手動チェックインを実行しますか？\nManually check in this participant?\n\n${name} (${email})`
+            `⚠️ 手動チェックインの確認 / CONFIRMATION ⚠️\n\nこの操作でこの参加者をチェックインします。\nThis will check in the following participant:\n\n${name}\n${email}\n\n実行しますか？\nProceed with manual check-in?`
           )
         ) {
           return;
