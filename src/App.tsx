@@ -782,6 +782,7 @@ export default function App() {
   const [simpleMode, setSimpleMode] = useState<boolean>(true); // Toggle for hiding columns
 
   // Paid participants view state
+  const [simpleModeForPaid, setSimpleModeForPaid] = useState<boolean>(true); // Toggle for hiding columns in paid table
   const [paidHeaders, setPaidHeaders] = useState<string[]>([]);
   const [paidRows, setPaidRows] = useState<
     Array<{ row_number: number; row_hash: string; data: Record<string, any> }>
@@ -1201,6 +1202,21 @@ This is your entry pass. Show this link at the entrance.
     // Filter out columns from startIdx to endIdx (inclusive)
     return tableHeaders.filter((_, idx) => idx < startIdx || idx > endIdx);
   }, [tableHeaders, simpleMode]);
+
+  // Filter paid headers based on simple mode toggle
+  const displayPaidHeaders = useMemo(() => {
+    if (!simpleModeForPaid) return paidHeaders;
+
+    // Find the indices of the columns to hide
+    const startIdx = paidHeaders.findIndex((h) => h === "フリガナ");
+    const endIdx = paidHeaders.findIndex((h) => h === "園児（利用者）氏名");
+
+    // If either column is not found, return all headers
+    if (startIdx === -1 || endIdx === -1) return paidHeaders;
+
+    // Filter out columns from startIdx to endIdx (inclusive)
+    return paidHeaders.filter((_, idx) => idx < startIdx || idx > endIdx);
+  }, [paidHeaders, simpleModeForPaid]);
 
   // Attempt to auto-detect adult/child header keys from current headers
   useEffect(() => {
@@ -2660,6 +2676,16 @@ This is your entry pass. Show this link at the entrance.
                       <h3 className="font-medium">支払い済み参加者一覧</h3>
                       <div className="flex items-center gap-2">
                         <button
+                          onClick={() => setSimpleModeForPaid(!simpleModeForPaid)}
+                          className={`rounded border px-3 py-1 text-sm whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-300 ${
+                            simpleModeForPaid
+                              ? "text-white bg-indigo-600 border-indigo-600 hover:bg-indigo-700"
+                              : "text-indigo-700 border-indigo-300 bg-white hover:bg-indigo-50"
+                          }`}
+                        >
+                          簡単モード
+                        </button>
+                        <button
                           onClick={loadPaidParticipants}
                           className="rounded border px-3 py-1 text-sm text-indigo-700 border-indigo-300 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-300"
                         >
@@ -2683,7 +2709,7 @@ This is your entry pass. Show this link at the entrance.
                             <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
                               #
                             </th>
-                            {paidHeaders.map((h, idx) => (
+                            {displayPaidHeaders.map((h, idx) => (
                               <th
                                 key={`paid-${idx}-${h || ""}`}
                                 className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap"
@@ -2700,7 +2726,7 @@ This is your entry pass. Show this link at the entrance.
                           {paidRows.length === 0 ? (
                             <tr>
                               <td
-                                colSpan={2 + paidHeaders.length}
+                                colSpan={2 + displayPaidHeaders.length}
                                 className="px-3 py-4 text-center text-gray-500"
                               >
                                 No paid participants yet
@@ -2715,7 +2741,7 @@ This is your entry pass. Show this link at the entrance.
                                 <td className="px-3 py-2 text-gray-700 whitespace-nowrap">
                                   {r.row_number}
                                 </td>
-                                {paidHeaders.map((h, idx) => (
+                                {displayPaidHeaders.map((h, idx) => (
                                   <td
                                     key={`paid-${r.row_number}-${idx}`}
                                     className="px-3 py-2 text-gray-800 whitespace-nowrap"
