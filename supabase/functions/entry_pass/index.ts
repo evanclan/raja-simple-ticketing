@@ -668,90 +668,154 @@ Deno.serve(async (req) => {
     }
 
     if (body.action === "send_email") {
-      await requireAdmin(req);
-      const baseUrl =
-        body.baseUrl?.trim() || Deno.env.get("PUBLIC_APP_URL") || "";
-      if (!baseUrl) throw new Error("Missing baseUrl (set PUBLIC_APP_URL)");
-      if (!body.row_hash) throw new Error("row_hash is required");
-      const token = await signToken({ rh: body.row_hash });
-      const url = `${baseUrl.replace(/\/$/, "")}/pass/${token}`;
-      const { data, error } = await supabase
-        .from("paidparticipants")
-        .select("headers, data")
-        .eq("row_hash", body.row_hash)
-        .single();
-      if (error) throw error;
-      const to = (
-        body.to ||
-        detectEmail(data?.headers, data?.data) ||
-        ""
-      ).trim();
-      if (!to || !isEmail(to))
-        throw new Error("Recipient email not found for this row");
-      const name = (
-        body.name ||
-        detectName(data?.headers, data?.data) ||
-        ""
-      ).trim();
-      const subject = (body.subject || "Your Entry Pass").trim();
-      const from = resolveAllowedFrom(body.from);
+      try {
+        await requireAdmin(req);
 
-      // Template variables for processing
-      const templateVars = {
-        name: name || "",
-        email: to || "",
-        url: url,
-      };
+        // Check required environment variables first
+        const resendKey = Deno.env.get("RESEND_API_KEY");
+        if (!resendKey) {
+          secureLog("Missing RESEND_API_KEY environment variable");
+          throw new Error(
+            "Email service not configured - missing RESEND_API_KEY"
+          );
+        }
 
-      const defaultHtml = `<div>
+        const baseUrl =
+          body.baseUrl?.trim() || Deno.env.get("PUBLIC_APP_URL") || "";
+        if (!baseUrl) {
+          secureLog("Missing PUBLIC_APP_URL environment variable");
+          throw new Error("Missing baseUrl (set PUBLIC_APP_URL)");
+        }
+
+        if (!body.row_hash) {
+          secureLog("Missing row_hash in request body");
+          throw new Error("row_hash is required");
+        }
+
+        secureLog(
+          `Generating token for row_hash: ${body.row_hash.slice(0, 8)}...`
+        );
+        const token = await signToken({ rh: body.row_hash });
+        const url = `${baseUrl.replace(/\/$/, "")}/pass/${token}`;
+
+        secureLog("Fetching participant data from database");
+        const { data, error } = await supabase
+          .from("paidparticipants")
+          .select("headers, data")
+          .eq("row_hash", body.row_hash)
+          .single();
+
+        if (error) {
+          secureLog(`Database error: ${error.code} - ${error.message}`);
+          throw new Error(`Failed to find participant data: ${error.message}`);
+        }
+
+        if (!data) {
+          secureLog("No participant data found for row_hash");
+          throw new Error("No participant found for this row_hash");
+        }
+
+        const to = (
+          body.to ||
+          detectEmail(data?.headers, data?.data) ||
+          ""
+        ).trim();
+
+        if (!to || !isEmail(to)) {
+          secureLog(
+            `Email detection failed. Headers: ${JSON.stringify(
+              data?.headers?.slice(0, 5)
+            )}`
+          );
+          throw new Error("Recipient email not found for this row");
+        }
+
+        secureLog(`Email recipient found: ${to.slice(0, 3)}***`);
+
+        const name = (
+          body.name ||
+          detectName(data?.headers, data?.data) ||
+          ""
+        ).trim();
+        const subject = (body.subject || "Your Entry Pass").trim();
+
+        secureLog("Resolving sender email address");
+        const from = resolveAllowedFrom(body.from);
+
+        // Template variables for processing
+        const templateVars = {
+          name: name || "",
+          email: to || "",
+          url: url,
+        };
+
+        const defaultHtml = `<div>
   <p>${name ? `${name} 様` : ""}</p>
   <p>イベントの入場用リンクです。こちらのリンクを当日入口でスタッフにお見せください。</p>
   <p>This is your entry pass. Show this link at the entrance on event day.</p>
   <p><a href="${url}">${url}</a></p>
 </div>`;
-      const defaultText = `${
-        name ? `${name} 様\n` : ""
-      }イベントの入場用リンクです。当日入口でスタッフにお見せください。\nThis is your entry pass. Show this link at the entrance.\n${url}`;
+        const defaultText = `${
+          name ? `${name} 様\n` : ""
+        }イベントの入場用リンクです。当日入口でスタッフにお見せください。\nThis is your entry pass. Show this link at the entrance.\n${url}`;
 
-      // Process templates with variables
-      const html = processEmailTemplate(body.html || defaultHtml, templateVars);
-      const text = processEmailTemplate(body.text || defaultText, templateVars);
+        // Process templates with variables
+        const html = processEmailTemplate(
+          body.html || defaultHtml,
+          templateVars
+        );
+        const text = processEmailTemplate(
+          body.text || defaultText,
+          templateVars
+        );
 
-      // Handle PDF attachment if provided
-      let attachments: Array<{ filename: string; content: string }> | undefined;
+        // Handle PDF attachment if provided
+        let attachments:
+          | Array<{ filename: string; content: string }>
+          | undefined;
 
-      if (body.pdfBase64 && body.pdfName) {
-        // Handle base64 PDF attachment
-        const base64Content = body.pdfBase64.includes(",")
-          ? body.pdfBase64.split(",")[1]
-          : body.pdfBase64;
+        if (body.pdfBase64 && body.pdfName) {
+          // Handle base64 PDF attachment
+          const base64Content = body.pdfBase64.includes(",")
+            ? body.pdfBase64.split(",")[1]
+            : body.pdfBase64;
 
-        attachments = [
-          {
-            filename: body.pdfName,
-            content: base64Content,
-          },
-        ];
-      } else if (body.pdfUrl) {
-        // Handle URL-based PDF attachment
-        const pdfAttachment = await fetchPdfAttachment(body.pdfUrl);
-        if (pdfAttachment) {
-          attachments = [pdfAttachment];
+          attachments = [
+            {
+              filename: body.pdfName,
+              content: base64Content,
+            },
+          ];
+        } else if (body.pdfUrl) {
+          // Handle URL-based PDF attachment
+          const pdfAttachment = await fetchPdfAttachment(body.pdfUrl);
+          if (pdfAttachment) {
+            attachments = [pdfAttachment];
+          }
         }
-      }
 
-      const result = await sendViaResend({
-        to,
-        subject,
-        html,
-        text,
-        from,
-        attachments,
-      });
-      return new Response(
-        JSON.stringify({ ok: true, url, token, provider: "resend", result }),
-        { headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
+        secureLog("Sending email via Resend");
+        const result = await sendViaResend({
+          to,
+          subject,
+          html,
+          text,
+          from,
+          attachments,
+        });
+
+        secureLog("Email sent successfully");
+        return new Response(
+          JSON.stringify({ ok: true, url, token, provider: "resend", result }),
+          { headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      } catch (emailError: any) {
+        secureLog("Error in send_email action", {
+          error: emailError?.message,
+          stack: emailError?.stack?.split("\n")[0],
+        });
+        throw emailError;
+      }
     }
 
     if (body.action === "bulk_send") {
