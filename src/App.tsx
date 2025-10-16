@@ -860,6 +860,11 @@ export default function App() {
     return new Map();
   });
 
+  // Manual check-in state
+  const [manualCheckingInHash, setManualCheckingInHash] = useState<
+    string | null
+  >(null);
+
   // Dropdown menu state for actions
   const [openDropdownHash, setOpenDropdownHash] = useState<string | null>(null);
   const [dropdownPosition, setDropdownPosition] = useState<{
@@ -1997,6 +2002,80 @@ This is your entry pass. Show this link at the entrance.
     input.click();
   }
 
+  async function handleManualCheckIn(row: {
+    row_number: number;
+    row_hash: string;
+    data: Record<string, any>;
+  }) {
+    try {
+      if (!userToken) {
+        alert("Please sign in first");
+        return;
+      }
+
+      const email = findEmailForRow(row.data);
+      const name = findNameForRow(row.data) || "";
+
+      // Check if already checked in
+      const { data: existingCheckin, error: checkError } = await supabase
+        .from("checkins")
+        .select("checked_in_at")
+        .eq("row_hash", row.row_hash)
+        .maybeSingle();
+
+      if (checkError && checkError.code !== "PGRST116") {
+        throw checkError;
+      }
+
+      if (existingCheckin) {
+        const checkedInTime = new Date(
+          existingCheckin.checked_in_at
+        ).toLocaleString();
+        if (
+          !confirm(
+            `この参加者は既にチェックイン済みです。\nThis participant is already checked in.\n\nChecked in at: ${checkedInTime}\n\nCheck in again?`
+          )
+        ) {
+          return;
+        }
+      } else {
+        if (
+          !confirm(
+            `手動チェックインを実行しますか？\nManually check in this participant?\n\n${name} (${email})`
+          )
+        ) {
+          return;
+        }
+      }
+
+      setManualCheckingInHash(row.row_hash);
+
+      // Insert or update check-in record
+      const { error: insertError } = await supabase.from("checkins").upsert(
+        {
+          row_hash: row.row_hash,
+          checked_in_at: new Date().toISOString(),
+          checked_in_by: userEmail || "manual",
+        },
+        { onConflict: "row_hash" }
+      );
+
+      if (insertError) throw insertError;
+
+      alert(
+        `✓ チェックイン完了！\n✓ Check-in successful!\n\n${name} (${email})`
+      );
+      setResultMessage(`Manually checked in: ${name}`);
+    } catch (e: any) {
+      console.error(e);
+      const message =
+        e?.message || e?.error_description || e?.hint || String(e);
+      alert(`Failed to check in. ${message}`);
+    } finally {
+      setManualCheckingInHash(null);
+    }
+  }
+
   async function handleBulkSendPasses() {
     if (!confirm("Send entry pass email to all paid participants?")) return;
     try {
@@ -2676,7 +2755,9 @@ This is your entry pass. Show this link at the entrance.
                       <h3 className="font-medium">支払い済み参加者一覧</h3>
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => setSimpleModeForPaid(!simpleModeForPaid)}
+                          onClick={() =>
+                            setSimpleModeForPaid(!simpleModeForPaid)
+                          }
                           className={`rounded border px-3 py-1 text-sm whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-300 ${
                             simpleModeForPaid
                               ? "text-white bg-indigo-600 border-indigo-600 hover:bg-indigo-700"
@@ -2972,6 +3053,40 @@ This is your entry pass. Show this link at the entrance.
                                                         r.row_hash
                                                       ? "アップロード中…"
                                                       : "領収書をアップロード"}
+                                                  </span>
+                                                </button>
+
+                                                {/* Manual Check-in */}
+                                                <button
+                                                  onClick={() => {
+                                                    setOpenDropdownHash(null);
+                                                    setDropdownPosition(null);
+                                                    handleManualCheckIn(r);
+                                                  }}
+                                                  disabled={
+                                                    manualCheckingInHash ===
+                                                    r.row_hash
+                                                  }
+                                                  className="w-full text-left px-4 py-2 text-sm text-orange-700 hover:bg-orange-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                                >
+                                                  <svg
+                                                    className="w-4 h-4"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    viewBox="0 0 24 24"
+                                                  >
+                                                    <path
+                                                      strokeLinecap="round"
+                                                      strokeLinejoin="round"
+                                                      strokeWidth={2}
+                                                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                                                    />
+                                                  </svg>
+                                                  <span>
+                                                    {manualCheckingInHash ===
+                                                    r.row_hash
+                                                      ? "チェックイン中…"
+                                                      : "手動チェックイン"}
                                                   </span>
                                                 </button>
 
