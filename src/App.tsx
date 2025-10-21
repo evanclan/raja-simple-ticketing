@@ -490,49 +490,70 @@ function EntryPassView({ token }: { token: string }) {
       return;
     }
     (async () => {
-      try {
-        setLoading(true);
-        setError("");
-        const resp = await fetchWithTimeout(
-          `${supabaseUrl}/functions/v1/entry_pass`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              apikey: import.meta.env.VITE_SUPABASE_ANON_KEY as string,
-              Authorization: `Bearer ${
-                import.meta.env.VITE_SUPABASE_ANON_KEY as string
-              }`,
+      let retries = 2; // Allow 2 retries for better reliability during high load
+
+      while (retries >= 0) {
+        try {
+          setLoading(true);
+          setError("");
+          const resp = await fetchWithTimeout(
+            `${supabaseUrl}/functions/v1/entry_pass`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                apikey: import.meta.env.VITE_SUPABASE_ANON_KEY as string,
+                Authorization: `Bearer ${
+                  import.meta.env.VITE_SUPABASE_ANON_KEY as string
+                }`,
+              },
+              body: JSON.stringify({ action: "resolve", token }),
             },
-            body: JSON.stringify({ action: "resolve", token }),
-          }
-        );
-        if (!resp.ok) {
-          const txt = await resp.text();
-          throw new Error(`HTTP ${resp.status}: ${txt}`);
-        }
-        const json = await resp.json();
-        const p = json?.participant;
-        setParticipant(
-          p
-            ? {
-                row_number: p.row_number as number,
-                headers: (p.headers as string[]) || [],
-                data: (p.data as Record<string, any>) || {},
-              }
-            : null
-        );
-        setCheckin(json?.checkin ?? null);
-      } catch (e: any) {
-        if (e?.name === "AbortError") {
-          setError(
-            "Request timed out. Please check your connection and try again."
+            25000 // Increased timeout to 25 seconds for high-load scenarios
           );
-        } else {
-          setError(e?.message || String(e));
+          if (!resp.ok) {
+            const txt = await resp.text();
+            throw new Error(`HTTP ${resp.status}: ${txt}`);
+          }
+          const json = await resp.json();
+          const p = json?.participant;
+          setParticipant(
+            p
+              ? {
+                  row_number: p.row_number as number,
+                  headers: (p.headers as string[]) || [],
+                  data: (p.data as Record<string, any>) || {},
+                }
+              : null
+          );
+          setCheckin(json?.checkin ?? null);
+          // Success - exit retry loop
+          return;
+        } catch (e: any) {
+          retries--;
+
+          if (retries >= 0) {
+            // Wait before retrying (exponential backoff)
+            const delay = (2 - retries) * 1000; // 1s, 2s
+            await new Promise((resolve) => setTimeout(resolve, delay));
+            continue;
+          }
+
+          // All retries exhausted
+          if (e?.name === "AbortError") {
+            setError(
+              "Request timed out. The system may be experiencing high traffic. Please wait a moment and try refreshing the page."
+            );
+          } else {
+            setError(
+              e?.message ||
+                String(e) +
+                  " - If the problem persists, please contact event staff."
+            );
+          }
+        } finally {
+          setLoading(false);
         }
-      } finally {
-        setLoading(false);
       }
     })();
   }, [supabaseUrl, token]);
