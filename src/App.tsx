@@ -863,6 +863,7 @@ export default function App() {
   });
 
   // Receipt upload state - stores uploaded PDF receipts per participant
+  // @ts-ignore - temporarily disabled
   const [uploadingReceiptHash, setUploadingReceiptHash] = useState<
     string | null
   >(null);
@@ -1953,6 +1954,7 @@ This is your entry pass. Show this link at the entrance.
     }
   }
 
+  // @ts-ignore - temporarily disabled
   function handleUploadReceipt(row: {
     row_number: number;
     row_hash: string;
@@ -3034,8 +3036,8 @@ This is your entry pass. Show this link at the entrance.
                                                   </span>
                                                 </button>
 
-                                                {/* Upload Receipt */}
-                                                <button
+                                                {/* Upload Receipt - TEMPORARILY DISABLED */}
+                                                {/* <button
                                                   onClick={() => {
                                                     setOpenDropdownHash(null);
                                                     setDropdownPosition(null);
@@ -3075,7 +3077,7 @@ This is your entry pass. Show this link at the entrance.
                                                       ? "アップロード中…"
                                                       : "領収書をアップロード"}
                                                   </span>
-                                                </button>
+                                                </button> */}
 
                                                 {/* Manual Check-in */}
                                                 <button
