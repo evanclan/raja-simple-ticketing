@@ -1790,22 +1790,26 @@ This is your entry pass. Show this link at the entrance.
         return;
       }
 
-      // Check if receipt is uploaded
+      // Check if receipt is uploaded (DISABLED - allow sending without receipt)
       const receipt = uploadedReceipts.get(row.row_hash);
-      if (!receipt) {
-        alert(
-          "領収書必要です\n\nReceipt is required!\n\nPlease upload the receipt PDF first before sending confirmation email."
-        );
-        return;
-      }
+      // if (!receipt) {
+      //   alert(
+      //     "領収書必要です\n\nReceipt is required!\n\nPlease upload the receipt PDF first before sending confirmation email."
+      //   );
+      //   return;
+      // }
 
       const name = findNameForRow(row.data) || "";
 
       // Check if already sent
       const alreadySent = sentConfirmations.has(row.row_hash);
       const confirmMessage = alreadySent
-        ? `このユーザーには既に確認メールを送信済みです。\n再送信しますか？\n\nThis user has already received a confirmation email.\nResend confirmation email with receipt to:\n${name} (${email})\n\nReceipt: ${receipt.fileName}`
-        : `確認メールを送信しますか？\n\nSend confirmation email with receipt to:\n${name} (${email})\n\nReceipt: ${receipt.fileName}`;
+        ? `このユーザーには既に確認メールを送信済みです。\n再送信しますか？\n\nThis user has already received a confirmation email.\nResend confirmation email to:\n${name} (${email})${
+            receipt ? `\n\nReceipt: ${receipt.fileName}` : ""
+          }`
+        : `確認メールを送信しますか？\n\nSend confirmation email to:\n${name} (${email})${
+            receipt ? `\n\nReceipt: ${receipt.fileName}` : ""
+          }`;
 
       if (!confirm(confirmMessage)) {
         return;
@@ -1857,9 +1861,9 @@ This is your entry pass. Show this link at the entrance.
             html,
             text,
             from: fromDisplay,
-            // Attach the uploaded receipt PDF
-            pdfBase64: receipt.fileData,
-            pdfName: receipt.fileName,
+            // Attach the uploaded receipt PDF (optional - only if available)
+            pdfBase64: receipt?.fileData,
+            pdfName: receipt?.fileName,
           }),
         }
       );
@@ -2990,11 +2994,7 @@ This is your entry pass. Show this link at the entrance.
                                                       : sendingConfirmHash ===
                                                         r.row_hash
                                                       ? "送信中…"
-                                                      : uploadedReceipts.has(
-                                                          r.row_hash
-                                                        )
-                                                      ? "確認メールを送信"
-                                                      : "確認メールを送信 (⚠️ 領収書必要)"}
+                                                      : "確認メールを送信"}
                                                   </span>
                                                 </button>
 
