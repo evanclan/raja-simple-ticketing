@@ -2800,6 +2800,24 @@ This is your entry pass. Show this link at the entrance.
                           更新
                         </button>
                         <button
+                          onClick={() => {
+                            if (
+                              confirm(
+                                "すべての領収書データを削除しますか？\n\nClear all uploaded receipt PDFs?\n\nThis will remove all stored receipt files from browser storage."
+                              )
+                            ) {
+                              setUploadedReceipts(new Map());
+                              localStorage.removeItem("uploaded_receipts");
+                              alert(
+                                "✓ すべての領収書を削除しました\n✓ All receipts cleared"
+                              );
+                            }
+                          }}
+                          className="rounded border px-3 py-1 text-sm text-red-700 border-red-300 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-300"
+                        >
+                          領収書を全削除
+                        </button>
+                        <button
                           onClick={handleBulkSendPasses}
                           disabled={true}
                           className="rounded border px-3 py-1 text-sm text-purple-700 border-purple-300 bg-purple-50 hover:bg-purple-100 disabled:opacity-50"
