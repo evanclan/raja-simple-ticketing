@@ -572,7 +572,7 @@ Deno.serve(async (req) => {
         // Try using Supabase client directly - it should use service role key
         const { data, error } = await supabase
           .from("paidparticipants")
-          .select("row_number, headers, data")
+          .select("row_number, headers, data, click_count")
           .eq("row_hash", rh)
           .single();
 
@@ -584,6 +584,19 @@ Deno.serve(async (req) => {
         }
 
         secureLog("Participant data retrieved successfully");
+
+        // Increment click count to track link access
+        const { error: updateError } = await supabase
+          .from("paidparticipants")
+          .update({ click_count: (data.click_count || 0) + 1 })
+          .eq("row_hash", rh);
+
+        if (updateError) {
+          secureLog("Warning: Failed to update click count", {
+            code: updateError.code,
+          });
+          // Don't fail the request if click count update fails
+        }
 
         const { data: checkin, error: cErr } = await supabase
           .from("checkins")

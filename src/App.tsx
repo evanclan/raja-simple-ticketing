@@ -806,7 +806,12 @@ export default function App() {
   const [simpleModeForPaid, setSimpleModeForPaid] = useState<boolean>(true); // Toggle for hiding columns in paid table
   const [paidHeaders, setPaidHeaders] = useState<string[]>([]);
   const [paidRows, setPaidRows] = useState<
-    Array<{ row_number: number; row_hash: string; data: Record<string, any> }>
+    Array<{
+      row_number: number;
+      row_hash: string;
+      data: Record<string, any>;
+      click_count?: number;
+    }>
   >([]);
   const [paidHashes, setPaidHashes] = useState<Set<string>>(new Set());
   const [pendingUnmarkHash, setPendingUnmarkHash] = useState<string | null>(
@@ -1768,7 +1773,7 @@ This is your entry pass. Show this link at the entrance.
   async function loadPaidParticipants() {
     const { data, error } = await supabase
       .from("paidparticipants")
-      .select("row_number, row_hash, headers, data")
+      .select("row_number, row_hash, headers, data, click_count")
       .order("row_number", { ascending: true });
     if (error) return; // silent
     const headersFromFirst =
@@ -1778,6 +1783,7 @@ This is your entry pass. Show this link at the entrance.
       row_number: r.row_number as number,
       row_hash: r.row_hash as string,
       data: r.data as Record<string, any>,
+      click_count: (r.click_count as number) || 0,
     }));
     setPaidRows(mapped);
     setPaidHashes(new Set(mapped.map((r: any) => r.row_hash)));
@@ -2920,6 +2926,9 @@ This is your entry pass. Show this link at the entrance.
                               </th>
                             ))}
                             <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
+                              クリック数
+                            </th>
+                            <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
                               操作
                             </th>
                           </tr>
@@ -2928,7 +2937,7 @@ This is your entry pass. Show this link at the entrance.
                           {paidRows.length === 0 ? (
                             <tr>
                               <td
-                                colSpan={2 + displayPaidHeaders.length}
+                                colSpan={3 + displayPaidHeaders.length}
                                 className="px-3 py-4 text-center text-gray-500"
                               >
                                 No paid participants yet
@@ -2953,6 +2962,19 @@ This is your entry pass. Show this link at the entrance.
                                     )}
                                   </td>
                                 ))}
+                                <td className="px-3 py-2 text-center whitespace-nowrap">
+                                  <span
+                                    className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
+                                      (r.click_count || 0) === 0
+                                        ? "bg-red-100 text-red-800"
+                                        : (r.click_count || 0) >= 1
+                                        ? "bg-green-100 text-green-800"
+                                        : "bg-gray-100 text-gray-800"
+                                    }`}
+                                  >
+                                    {r.click_count || 0}
+                                  </span>
+                                </td>
                                 <td className="px-3 py-2 text-gray-800 whitespace-nowrap">
                                   {processingUnmarkHash === r.row_hash ? (
                                     <button
