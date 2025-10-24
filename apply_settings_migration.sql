@@ -38,9 +38,9 @@ CREATE INDEX IF NOT EXISTS settings_key_idx ON public.settings(key);
 -- STEP 2: Insert/Update your custom templates
 -- =====================================================
 
--- Entry Pass Subject
+-- Entry Pass Subject (Custom Halloween Cruise Subject)
 INSERT INTO public.settings (key, value)
-VALUES ('entry_pass_subject', 'Your Entry Pass')
+VALUES ('entry_pass_subject', '【RaJA Halloween Cruise 2025】当日のご案内＆WEBチケットのご確認')
 ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW();
 
 -- Entry Pass HTML (Your Custom Template)
