@@ -250,11 +250,24 @@ function CheckinsView() {
     })();
   }, [supabaseClient]);
 
+  // Calculate total number of people (sum of all adult, child, and infant)
+  const totalPeople = rows.reduce((sum, row) => {
+    const adult = parseInt(String(row.adult || 0), 10) || 0;
+    const child = parseInt(String(row.child || 0), 10) || 0;
+    const infant = parseInt(String(row.infant || 0), 10) || 0;
+    return sum + adult + child + infant;
+  }, 0);
+
   return (
     <div className="rounded-lg border bg-white p-6 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-lg font-semibold">チェックイン済みの参加者</h2>
-        <span className="text-sm text-gray-600">Total: {rows.length}</span>
+        <div className="flex items-center gap-4 text-sm text-gray-600">
+          <span>Total registered family: {rows.length}</span>
+          <span className="font-semibold text-indigo-700">
+            Total people: {totalPeople}
+          </span>
+        </div>
       </div>
       {loading ? (
         <div className="text-gray-600">読み込み中…</div>
