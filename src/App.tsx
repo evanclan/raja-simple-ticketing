@@ -1062,6 +1062,7 @@ This is your entry pass. Show this link at the entrance.
     if (!userToken) return; // Wait for authentication
 
     (async () => {
+      // Load payment confirmation templates
       const s = await loadSetting("email_tpl_subject", "Payment confirmation");
       const h = await loadSetting(
         "email_tpl_html",
@@ -1088,6 +1089,31 @@ This is your entry pass. Show this link at the entrance.
       if (t) setTextTemplate(t);
       if (tr) setTestRecipient(tr);
       if (from) setFromDisplay(from);
+
+      // Load entry pass templates
+      const eps = await loadSetting("entry_pass_subject", "Your Entry Pass");
+      const eph = await loadSetting(
+        "entry_pass_html",
+        `<div>
+  <p>{{name}} 様</p>
+  <p>イベントの入場用リンクです。こちらのリンクを当日入口でスタッフにお見せください。</p>
+  <p>This is your entry pass. Show this link at the entrance on event day.</p>
+  <p><a href="{{url}}">{{url}}</a></p>
+</div>`
+      );
+      const ept = await loadSetting(
+        "entry_pass_text",
+        `{{name}} 様
+イベントの入場用リンクです。当日入口でスタッフにお見せください。
+This is your entry pass. Show this link at the entrance.
+{{url}}`
+      );
+      const epPdfUrl = await loadSetting("entry_pass_pdf_url", "");
+
+      if (eps) setEntryPassSubject(eps);
+      if (eph) setEntryPassHtml(eph);
+      if (ept) setEntryPassText(ept);
+      if (epPdfUrl) setEntryPassPdfUrl(epPdfUrl);
     })();
   }, [userToken]); // Load when user is authenticated
 
@@ -1105,16 +1131,18 @@ This is your entry pass. Show this link at the entrance.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subjectTemplate, htmlTemplate, textTemplate, fromDisplay]);
 
-  // Auto-save entry pass templates whenever they change
+  // Auto-save entry pass templates whenever they change (to both localStorage and database)
   useEffect(() => {
     const timer = setTimeout(() => {
-      localStorage.setItem("entry_pass_subject", entryPassSubject);
-      localStorage.setItem("entry_pass_html", entryPassHtml);
-      localStorage.setItem("entry_pass_text", entryPassText);
-      localStorage.setItem("entry_pass_pdf_url", entryPassPdfUrl);
+      // Save to both localStorage and database for cross-device sync
+      saveSetting("entry_pass_subject", entryPassSubject);
+      saveSetting("entry_pass_html", entryPassHtml);
+      saveSetting("entry_pass_text", entryPassText);
+      saveSetting("entry_pass_pdf_url", entryPassPdfUrl);
     }, 500); // Debounce by 500ms to avoid saving on every keystroke
 
     return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entryPassSubject, entryPassHtml, entryPassText, entryPassPdfUrl]);
 
   useEffect(() => {
@@ -1142,6 +1170,70 @@ This is your entry pass. Show this link at the entrance.
       }
     })();
   }, [supabaseUrl, supabaseAnonKey, isSupabaseConfigured]);
+
+  // Real-time sync for settings (email templates) across devices
+  useEffect(() => {
+    if (!isSupabaseConfigured || !userToken || !supabase) return;
+
+    // Subscribe to changes in the settings table
+    const channel = supabase
+      .channel("settings-changes")
+      .on(
+        "postgres_changes",
+        {
+          event: "*", // Listen to all events (INSERT, UPDATE, DELETE)
+          schema: "public",
+          table: "settings",
+        },
+        (payload: any) => {
+          // When another device/admin updates a setting, update the local state
+          const key = payload.new?.key;
+          const value = payload.new?.value;
+
+          if (!key) return;
+
+          // Update localStorage for backwards compatibility
+          localStorage.setItem(key, value);
+
+          // Update React state based on the setting key
+          switch (key) {
+            case "email_tpl_subject":
+              setSubjectTemplate(value);
+              break;
+            case "email_tpl_html":
+              setHtmlTemplate(value);
+              break;
+            case "email_tpl_text":
+              setTextTemplate(value);
+              break;
+            case "email_tpl_from":
+              setFromDisplay(value);
+              break;
+            case "email_tpl_test_recipient":
+              setTestRecipient(value);
+              break;
+            case "entry_pass_subject":
+              setEntryPassSubject(value);
+              break;
+            case "entry_pass_html":
+              setEntryPassHtml(value);
+              break;
+            case "entry_pass_text":
+              setEntryPassText(value);
+              break;
+            case "entry_pass_pdf_url":
+              setEntryPassPdfUrl(value);
+              break;
+          }
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscription on unmount
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isSupabaseConfigured, userToken]);
 
   const isDisabled = useMemo(() => isSyncing, [isSyncing]);
 
