@@ -608,7 +608,7 @@ function EntryPassView({ token }: { token: string }) {
       <header className="border-b border-red-100 bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60">
         <div className="mx-auto max-w-2xl px-4 pt-6 pb-4">
           <h1 className="text-base sm:text-xl font-semibold text-indigo-700">
-            入場パス
+            WEB チケット
           </h1>
         </div>
       </header>
@@ -1055,20 +1055,29 @@ This is your entry pass. Show this link at the entrance.
   // Load templates from database AFTER authentication is ready
   useEffect(() => {
     if (!userToken) return; // Wait for authentication
-    
+
     (async () => {
       const s = await loadSetting("email_tpl_subject", "Payment confirmation");
-      const h = await loadSetting("email_tpl_html", `<div>
+      const h = await loadSetting(
+        "email_tpl_html",
+        `<div>
   <p>{{name}} 様</p>
   <p>お支払いを確認しました。ありがとうございます！</p>
   <p>領収書を添付しております。ご確認ください。</p>
   <p>This is a confirmation that we received your payment. Thank you!</p>
   <p>Please find your receipt attached to this email.</p>
-</div>`);
-      const t = await loadSetting("email_tpl_text", `{{name}} 様\nお支払いを確認しました。ありがとうございます！\n領収書を添付しております。ご確認ください。\n\nThis is a confirmation that we received your payment. Thank you!\nPlease find your receipt attached to this email.`);
+</div>`
+      );
+      const t = await loadSetting(
+        "email_tpl_text",
+        `{{name}} 様\nお支払いを確認しました。ありがとうございます！\n領収書を添付しております。ご確認ください。\n\nThis is a confirmation that we received your payment. Thank you!\nPlease find your receipt attached to this email.`
+      );
       const tr = await loadSetting("email_tpl_test_recipient");
-      const from = await loadSetting("email_tpl_from", "RaJA <no-reply@info.raja-international.com>");
-      
+      const from = await loadSetting(
+        "email_tpl_from",
+        "RaJA <no-reply@info.raja-international.com>"
+      );
+
       if (s) setSubjectTemplate(s);
       if (h) setHtmlTemplate(h);
       if (t) setTextTemplate(t);
@@ -1418,21 +1427,24 @@ This is your entry pass. Show this link at the entrance.
   }
 
   // Helper function to load a setting from database with localStorage fallback
-  async function loadSetting(key: string, fallbackValue?: string): Promise<string | null> {
+  async function loadSetting(
+    key: string,
+    fallbackValue?: string
+  ): Promise<string | null> {
     try {
       if (!supabase) return localStorage.getItem(key) || fallbackValue || null;
-      
+
       const { data, error } = await supabase
         .from("settings")
         .select("value")
         .eq("key", key)
         .maybeSingle();
-      
+
       if (error) {
         console.warn(`Failed to load setting ${key} from database:`, error);
         return localStorage.getItem(key) || fallbackValue || null;
       }
-      
+
       return data?.value || localStorage.getItem(key) || fallbackValue || null;
     } catch (e) {
       console.warn(`Error loading setting ${key}:`, e);
@@ -1445,14 +1457,17 @@ This is your entry pass. Show this link at the entrance.
     try {
       // Always save to localStorage for backwards compatibility
       localStorage.setItem(key, value);
-      
+
       if (!supabase || !userToken) return;
-      
+
       // Save to database for cross-device sync
       const { error } = await supabase
         .from("settings")
-        .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: "key" });
-      
+        .upsert(
+          { key, value, updated_at: new Date().toISOString() },
+          { onConflict: "key" }
+        );
+
       if (error) {
         console.warn(`Failed to save setting ${key} to database:`, error);
       }
@@ -1963,7 +1978,7 @@ This is your entry pass. Show this link at the entrance.
       if (alreadySent) {
         if (
           !confirm(
-            `このユーザーには既に入場パスを送信済みです。\n再送信しますか？\n\nThis user has already received an entry pass.\nResend entry pass to:\n${name} (${email})?`
+            `このユーザーには既にWEB チケットを送信済みです。\n再送信しますか？\n\nThis user has already received a web ticket.\nResend web ticket to:\n${name} (${email})?`
           )
         ) {
           return;
@@ -2527,7 +2542,7 @@ This is your entry pass. Show this link at the entrance.
               <div className="grid gap-4">
                 <div className="flex items-center justify-between">
                   <h3 className="font-medium">
-                    入場パス メール編集 (Entry Pass Email Editor)
+                    WEB チケット メール編集 (Web Ticket Email Editor)
                   </h3>
                   <button
                     onClick={() => setActivePage("main")}
@@ -2573,7 +2588,7 @@ This is your entry pass. Show this link at the entrance.
                         disabled={isSendingTestPass}
                         className="rounded bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 disabled:opacity-50"
                       >
-                        {isSendingTestPass ? "送信中…" : "テスト入場パス送信"}
+                        {isSendingTestPass ? "送信中…" : "テストWEB チケット送信"}
                       </button>
                     </div>
                   </div>
@@ -2883,7 +2898,7 @@ This is your entry pass. Show this link at the entrance.
                         >
                           {isBulkSendingPasses
                             ? "送信中…"
-                            : "入場パスを一括送信"}
+                            : "WEB チケットを一括送信"}
                         </button>
                       </div>
                     </div>
@@ -3105,11 +3120,11 @@ This is your entry pass. Show this link at the entrance.
                                                   </svg>
                                                   <span>
                                                     {sentPasses.has(r.row_hash)
-                                                      ? "✓ 入場パス送信済み"
+                                                      ? "✓ WEB チケット送信済み"
                                                       : sendingPassHash ===
                                                         r.row_hash
                                                       ? "送信中…"
-                                                      : "入場パスを送信"}
+                                                      : "WEB チケットを送信"}
                                                   </span>
                                                 </button>
 
@@ -3243,7 +3258,7 @@ This is your entry pass. Show this link at the entrance.
                         onClick={() => setActivePage("editEntryPass")}
                         className="rounded border px-3 py-1 text-sm text-indigo-700 border-indigo-300 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-300"
                       >
-                        入場パス メール編集
+                        WEB チケット メール編集
                       </button>
                     </div>
                     {/* Estimated Expected Calculation */}
@@ -3533,7 +3548,7 @@ This is your entry pass. Show this link at the entrance.
                     {/* Moved: Entry pass test sender (to bottom to avoid confusion with bulk send) */}
                     <div className="mt-10">
                       <div className="mb-2">
-                        <h3 className="font-medium">入場パス（テスト送信）</h3>
+                        <h3 className="font-medium">WEB チケット（テスト送信）</h3>
                       </div>
                       <div className="flex items-center gap-2">
                         <input
@@ -3552,7 +3567,7 @@ This is your entry pass. Show this link at the entrance.
                         >
                           {isSendingTestPass
                             ? "送信中…"
-                            : "テスト入場パスを送信"}
+                            : "テストWEB チケットを送信"}
                         </button>
                       </div>
                     </div>

@@ -82,4 +82,4 @@ dist/assets/index-Cj09WSMd.js   378.25 kB │ gzip: 108.32 kB
 4. Changes are automatically saved
 5. Refresh the page - your changes will be preserved!
 
-The same applies to the 入場パス メール編集 (Entry Pass Email Editor).
+The same applies to the WEB チケット メール編集 (Web Ticket Email Editor).
