@@ -307,13 +307,13 @@ function CheckinsView() {
                   電話番号
                 </th>
                 <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
-                  おとな参加人数（中学生以上)
+                  大人
                 </th>
                 <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
-                  こども参加人数（年少～小学生）
+                  こども
                 </th>
                 <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
-                  こども参加人数（年少々以下）
+                  赤ちゃん
                 </th>
                 <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
                   操作
