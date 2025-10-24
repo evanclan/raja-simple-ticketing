@@ -1042,8 +1042,20 @@ This is your entry pass. Show this link at the entrance.
         setSentConfirmations(new Set(JSON.parse(sent)));
       } catch {}
     }
+
+    // Load sent entry passes
+    const sentPass = localStorage.getItem("sent_entry_passes");
+    if (sentPass) {
+      try {
+        setSentPasses(new Set(JSON.parse(sentPass)));
+      } catch {}
+    }
+  }, []);
+
+  // Load templates from database AFTER authentication is ready
+  useEffect(() => {
+    if (!userToken) return; // Wait for authentication
     
-    // Load templates from database (with localStorage fallback)
     (async () => {
       const s = await loadSetting("email_tpl_subject", "Payment confirmation");
       const h = await loadSetting("email_tpl_html", `<div>
@@ -1063,15 +1075,7 @@ This is your entry pass. Show this link at the entrance.
       if (tr) setTestRecipient(tr);
       if (from) setFromDisplay(from);
     })();
-
-    // Load sent entry passes
-    const sentPass = localStorage.getItem("sent_entry_passes");
-    if (sentPass) {
-      try {
-        setSentPasses(new Set(JSON.parse(sentPass)));
-      } catch {}
-    }
-  }, []);
+  }, [userToken]); // Load when user is authenticated
 
   // Auto-save email templates whenever they change (to both localStorage and database)
   useEffect(() => {
