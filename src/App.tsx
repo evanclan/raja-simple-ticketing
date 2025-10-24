@@ -1042,17 +1042,27 @@ This is your entry pass. Show this link at the entrance.
         setSentConfirmations(new Set(JSON.parse(sent)));
       } catch {}
     }
-    // Load templates
-    const s = localStorage.getItem("email_tpl_subject");
-    const h = localStorage.getItem("email_tpl_html");
-    const t = localStorage.getItem("email_tpl_text");
-    const tr = localStorage.getItem("email_tpl_test_recipient");
-    const from = localStorage.getItem("email_tpl_from");
-    if (s) setSubjectTemplate(s);
-    if (h) setHtmlTemplate(h);
-    if (t) setTextTemplate(t);
-    if (tr) setTestRecipient(tr);
-    if (from) setFromDisplay(from);
+    
+    // Load templates from database (with localStorage fallback)
+    (async () => {
+      const s = await loadSetting("email_tpl_subject", "Payment confirmation");
+      const h = await loadSetting("email_tpl_html", `<div>
+  <p>{{name}} 様</p>
+  <p>お支払いを確認しました。ありがとうございます！</p>
+  <p>領収書を添付しております。ご確認ください。</p>
+  <p>This is a confirmation that we received your payment. Thank you!</p>
+  <p>Please find your receipt attached to this email.</p>
+</div>`);
+      const t = await loadSetting("email_tpl_text", `{{name}} 様\nお支払いを確認しました。ありがとうございます！\n領収書を添付しております。ご確認ください。\n\nThis is a confirmation that we received your payment. Thank you!\nPlease find your receipt attached to this email.`);
+      const tr = await loadSetting("email_tpl_test_recipient");
+      const from = await loadSetting("email_tpl_from", "RaJA <no-reply@info.raja-international.com>");
+      
+      if (s) setSubjectTemplate(s);
+      if (h) setHtmlTemplate(h);
+      if (t) setTextTemplate(t);
+      if (tr) setTestRecipient(tr);
+      if (from) setFromDisplay(from);
+    })();
 
     // Load sent entry passes
     const sentPass = localStorage.getItem("sent_entry_passes");
@@ -1063,17 +1073,18 @@ This is your entry pass. Show this link at the entrance.
     }
   }, []);
 
-  // Auto-save email templates whenever they change
+  // Auto-save email templates whenever they change (to both localStorage and database)
   useEffect(() => {
-    // Skip on initial mount (templates are loaded from localStorage above)
     const timer = setTimeout(() => {
-      localStorage.setItem("email_tpl_subject", subjectTemplate);
-      localStorage.setItem("email_tpl_html", htmlTemplate);
-      localStorage.setItem("email_tpl_text", textTemplate);
-      localStorage.setItem("email_tpl_from", fromDisplay);
+      // Save to both localStorage and database for cross-device sync
+      saveSetting("email_tpl_subject", subjectTemplate);
+      saveSetting("email_tpl_html", htmlTemplate);
+      saveSetting("email_tpl_text", textTemplate);
+      saveSetting("email_tpl_from", fromDisplay);
     }, 500); // Debounce by 500ms to avoid saving on every keystroke
 
     return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subjectTemplate, htmlTemplate, textTemplate, fromDisplay]);
 
   // Auto-save entry pass templates whenever they change
@@ -1402,6 +1413,50 @@ This is your entry pass. Show this link at the entrance.
     );
   }
 
+  // Helper function to load a setting from database with localStorage fallback
+  async function loadSetting(key: string, fallbackValue?: string): Promise<string | null> {
+    try {
+      if (!supabase) return localStorage.getItem(key) || fallbackValue || null;
+      
+      const { data, error } = await supabase
+        .from("settings")
+        .select("value")
+        .eq("key", key)
+        .maybeSingle();
+      
+      if (error) {
+        console.warn(`Failed to load setting ${key} from database:`, error);
+        return localStorage.getItem(key) || fallbackValue || null;
+      }
+      
+      return data?.value || localStorage.getItem(key) || fallbackValue || null;
+    } catch (e) {
+      console.warn(`Error loading setting ${key}:`, e);
+      return localStorage.getItem(key) || fallbackValue || null;
+    }
+  }
+
+  // Helper function to save a setting to both database and localStorage
+  async function saveSetting(key: string, value: string): Promise<void> {
+    try {
+      // Always save to localStorage for backwards compatibility
+      localStorage.setItem(key, value);
+      
+      if (!supabase || !userToken) return;
+      
+      // Save to database for cross-device sync
+      const { error } = await supabase
+        .from("settings")
+        .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: "key" });
+      
+      if (error) {
+        console.warn(`Failed to save setting ${key} to database:`, error);
+      }
+    } catch (e) {
+      console.warn(`Error saving setting ${key}:`, e);
+    }
+  }
+
   function persistTemplates() {
     localStorage.setItem("email_tpl_subject", subjectTemplate);
     localStorage.setItem("email_tpl_html", htmlTemplate);
@@ -1442,7 +1497,7 @@ This is your entry pass. Show this link at the entrance.
         alert("Enter a test recipient email");
         return;
       }
-      localStorage.setItem("email_tpl_test_recipient", to);
+      saveSetting("email_tpl_test_recipient", to);
       setIsSendingTest(true);
 
       const vars = {
