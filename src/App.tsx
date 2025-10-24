@@ -29,6 +29,7 @@ function CheckinsView() {
       row_hash: string;
       email: string;
       name: string;
+      phone: string;
       category: string;
       adult: number;
       child: number;
@@ -71,6 +72,21 @@ function CheckinsView() {
       "name",
       "申込者",
     ];
+    for (const key of candidates) {
+      const k = String(key || "").toLowerCase();
+      if (patterns.some((p) => k.includes(p.toLowerCase()))) {
+        const v = data?.[key];
+        if (v) return String(v);
+      }
+    }
+    return "";
+  }
+  function detectPhone(
+    headers: string[] | null | undefined,
+    data: Record<string, any>
+  ): string {
+    const candidates = (headers || []).map((h) => String(h || ""));
+    const patterns = ["電話番号", "電話", "phone", "tel", "携帯", "連絡先"];
     for (const key of candidates) {
       const k = String(key || "").toLowerCase();
       if (patterns.some((p) => k.includes(p.toLowerCase()))) {
@@ -224,6 +240,7 @@ function CheckinsView() {
           const data = p?.data || {};
           const email = detectEmail(headers, data);
           const name = detectName(headers, data);
+          const phone = detectPhone(headers, data);
           const category = detectCategory(headers, data);
           const adultKey = detectAdultKey(headers);
           const childKey = detectChildKey(headers);
@@ -235,6 +252,7 @@ function CheckinsView() {
             row_hash: c.row_hash,
             email,
             name,
+            phone,
             category,
             adult,
             child,
@@ -283,13 +301,10 @@ function CheckinsView() {
             <thead className="bg-red-50/60 border-b border-red-100">
               <tr>
                 <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
-                  メールアドレス
-                </th>
-                <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
                   代表者氏名
                 </th>
                 <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
-                  参加区分
+                  電話番号
                 </th>
                 <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
                   おとな参加人数（中学生以上)
@@ -309,13 +324,10 @@ function CheckinsView() {
               {rows.map((r) => (
                 <tr key={r.row_hash} className="odd:bg-white even:bg-gray-50">
                   <td className="px-3 py-2 text-gray-800 whitespace-nowrap">
-                    {r.email}
-                  </td>
-                  <td className="px-3 py-2 text-gray-800 whitespace-nowrap">
                     {r.name}
                   </td>
                   <td className="px-3 py-2 text-gray-800 whitespace-nowrap">
-                    {r.category}
+                    {r.phone}
                   </td>
                   <td className="px-3 py-2 text-gray-800 whitespace-nowrap">
                     {r.adult}
