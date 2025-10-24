@@ -2588,7 +2588,9 @@ This is your entry pass. Show this link at the entrance.
                         disabled={isSendingTestPass}
                         className="rounded bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 disabled:opacity-50"
                       >
-                        {isSendingTestPass ? "送信中…" : "テストWEB チケット送信"}
+                        {isSendingTestPass
+                          ? "送信中…"
+                          : "テストWEB チケット送信"}
                       </button>
                     </div>
                   </div>
@@ -3548,7 +3550,9 @@ This is your entry pass. Show this link at the entrance.
                     {/* Moved: Entry pass test sender (to bottom to avoid confusion with bulk send) */}
                     <div className="mt-10">
                       <div className="mb-2">
-                        <h3 className="font-medium">WEB チケット（テスト送信）</h3>
+                        <h3 className="font-medium">
+                          WEB チケット（テスト送信）
+                        </h3>
                       </div>
                       <div className="flex items-center gap-2">
                         <input
