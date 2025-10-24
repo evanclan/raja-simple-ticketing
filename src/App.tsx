@@ -263,9 +263,9 @@ function CheckinsView() {
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-lg font-semibold">チェックイン済みの参加者</h2>
         <div className="flex items-center gap-4 text-sm text-gray-600">
-          <span>Total registered family: {rows.length}</span>
+          <span>登録済み家族数: {rows.length}</span>
           <span className="font-semibold text-indigo-700">
-            Total people: {totalPeople}
+            総参加人数: {totalPeople}
           </span>
         </div>
       </div>
