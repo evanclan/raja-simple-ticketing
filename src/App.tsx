@@ -41,7 +41,7 @@ function CheckinsView() {
     }>
   >([]);
   const [absenceModalOpen, setAbsenceModalOpen] = useState<boolean>(false);
-  const [selectedRow, setSelectedRow] = useState<typeof rows[0] | null>(null);
+  const [selectedRow, setSelectedRow] = useState<(typeof rows)[0] | null>(null);
 
   const EMAIL_REGEX = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
   function detectEmail(
@@ -249,7 +249,9 @@ function CheckinsView() {
         setError("");
         const { data: checkins, error: cErr } = await supabaseClient
           .from("checkins")
-          .select("row_hash, checked_in_at, absent_adults, absent_children, absent_infants, absence_note")
+          .select(
+            "row_hash, checked_in_at, absent_adults, absent_children, absent_infants, absence_note"
+          )
           .order("checked_in_at", { ascending: false });
         if (cErr) throw cErr;
         const list = (checkins || []) as Array<{
@@ -335,7 +337,12 @@ function CheckinsView() {
     const absentAdult = parseInt(String(row.absent_adults || 0), 10) || 0;
     const absentChild = parseInt(String(row.absent_children || 0), 10) || 0;
     const absentInfant = parseInt(String(row.absent_infants || 0), 10) || 0;
-    return sum + (adult - absentAdult) + (child - absentChild) + (infant - absentInfant);
+    return (
+      sum +
+      (adult - absentAdult) +
+      (child - absentChild) +
+      (infant - absentInfant)
+    );
   }, 0);
 
   const totalAbsent = totalCheckedIn - totalActual;
@@ -364,15 +371,21 @@ function CheckinsView() {
     const handleSave = async () => {
       // Validation
       if (absentAdults > selectedRow.adult) {
-        alert(`欠席大人数（${absentAdults}）はチェックイン人数（${selectedRow.adult}）を超えられません`);
+        alert(
+          `欠席大人数（${absentAdults}）はチェックイン人数（${selectedRow.adult}）を超えられません`
+        );
         return;
       }
       if (absentChildren > selectedRow.child) {
-        alert(`欠席こども数（${absentChildren}）はチェックイン人数（${selectedRow.child}）を超えられません`);
+        alert(
+          `欠席こども数（${absentChildren}）はチェックイン人数（${selectedRow.child}）を超えられません`
+        );
         return;
       }
       if (absentInfants > selectedRow.infant) {
-        alert(`欠席赤ちゃん数（${absentInfants}）はチェックイン人数（${selectedRow.infant}）を超えられません`);
+        alert(
+          `欠席赤ちゃん数（${absentInfants}）はチェックイン人数（${selectedRow.infant}）を超えられません`
+        );
         return;
       }
 
@@ -400,7 +413,9 @@ function CheckinsView() {
           </h3>
 
           <div className="mb-4 p-3 bg-gray-50 rounded">
-            <p className="text-sm text-gray-700 font-medium mb-2">チェックイン人数:</p>
+            <p className="text-sm text-gray-700 font-medium mb-2">
+              チェックイン人数:
+            </p>
             <div className="text-sm text-gray-600 space-y-1">
               <div>• 大人: {selectedRow.adult}名</div>
               <div>• こども: {selectedRow.child}名</div>
@@ -419,10 +434,22 @@ function CheckinsView() {
                   min="0"
                   max={selectedRow.adult}
                   value={absentAdults}
-                  onChange={(e) => setAbsentAdults(Math.max(0, Math.min(selectedRow.adult, parseInt(e.target.value) || 0)))}
+                  onChange={(e) =>
+                    setAbsentAdults(
+                      Math.max(
+                        0,
+                        Math.min(
+                          selectedRow.adult,
+                          parseInt(e.target.value) || 0
+                        )
+                      )
+                    )
+                  }
                   className="border border-gray-300 rounded px-3 py-2 w-24 text-center"
                 />
-                <span className="text-sm text-gray-600">/ {selectedRow.adult}名</span>
+                <span className="text-sm text-gray-600">
+                  / {selectedRow.adult}名
+                </span>
               </div>
             </div>
 
@@ -436,10 +463,22 @@ function CheckinsView() {
                   min="0"
                   max={selectedRow.child}
                   value={absentChildren}
-                  onChange={(e) => setAbsentChildren(Math.max(0, Math.min(selectedRow.child, parseInt(e.target.value) || 0)))}
+                  onChange={(e) =>
+                    setAbsentChildren(
+                      Math.max(
+                        0,
+                        Math.min(
+                          selectedRow.child,
+                          parseInt(e.target.value) || 0
+                        )
+                      )
+                    )
+                  }
                   className="border border-gray-300 rounded px-3 py-2 w-24 text-center"
                 />
-                <span className="text-sm text-gray-600">/ {selectedRow.child}名</span>
+                <span className="text-sm text-gray-600">
+                  / {selectedRow.child}名
+                </span>
               </div>
             </div>
 
@@ -453,10 +492,22 @@ function CheckinsView() {
                   min="0"
                   max={selectedRow.infant}
                   value={absentInfants}
-                  onChange={(e) => setAbsentInfants(Math.max(0, Math.min(selectedRow.infant, parseInt(e.target.value) || 0)))}
+                  onChange={(e) =>
+                    setAbsentInfants(
+                      Math.max(
+                        0,
+                        Math.min(
+                          selectedRow.infant,
+                          parseInt(e.target.value) || 0
+                        )
+                      )
+                    )
+                  }
                   className="border border-gray-300 rounded px-3 py-2 w-24 text-center"
                 />
-                <span className="text-sm text-gray-600">/ {selectedRow.infant}名</span>
+                <span className="text-sm text-gray-600">
+                  / {selectedRow.infant}名
+                </span>
               </div>
             </div>
 
@@ -553,8 +604,11 @@ function CheckinsView() {
                 const actualAdult = r.adult - r.absent_adults;
                 const actualChild = r.child - r.absent_children;
                 const actualInfant = r.infant - r.absent_infants;
-                const hasAbsence = r.absent_adults > 0 || r.absent_children > 0 || r.absent_infants > 0;
-                
+                const hasAbsence =
+                  r.absent_adults > 0 ||
+                  r.absent_children > 0 ||
+                  r.absent_infants > 0;
+
                 return (
                   <tr key={r.row_hash} className="odd:bg-white even:bg-gray-50">
                     <td className="px-3 py-2 text-gray-800 whitespace-nowrap">
@@ -566,7 +620,9 @@ function CheckinsView() {
                     <td className="px-3 py-2 text-gray-800 whitespace-nowrap">
                       {r.absent_adults > 0 ? (
                         <span>
-                          <span className="text-gray-500 line-through">{r.adult}</span>
+                          <span className="text-gray-500 line-through">
+                            {r.adult}
+                          </span>
                           {" → "}
                           <span className="font-semibold">{actualAdult}</span>
                         </span>
@@ -577,7 +633,9 @@ function CheckinsView() {
                     <td className="px-3 py-2 text-gray-800 whitespace-nowrap">
                       {r.absent_children > 0 ? (
                         <span>
-                          <span className="text-gray-500 line-through">{r.child}</span>
+                          <span className="text-gray-500 line-through">
+                            {r.child}
+                          </span>
                           {" → "}
                           <span className="font-semibold">{actualChild}</span>
                         </span>
@@ -588,7 +646,9 @@ function CheckinsView() {
                     <td className="px-3 py-2 text-gray-800 whitespace-nowrap">
                       {r.absent_infants > 0 ? (
                         <span>
-                          <span className="text-gray-500 line-through">{r.infant}</span>
+                          <span className="text-gray-500 line-through">
+                            {r.infant}
+                          </span>
                           {" → "}
                           <span className="font-semibold">{actualInfant}</span>
                         </span>
@@ -604,7 +664,11 @@ function CheckinsView() {
                             setAbsenceModalOpen(true);
                           }}
                           className="rounded px-3 py-1 text-sm border text-orange-700 border-orange-300 bg-orange-50 hover:bg-orange-100"
-                          title={hasAbsence ? r.absence_note || "欠席登録済み" : "欠席登録"}
+                          title={
+                            hasAbsence
+                              ? r.absence_note || "欠席登録済み"
+                              : "欠席登録"
+                          }
                         >
                           {hasAbsence ? "欠席編集" : "欠席登録"}
                         </button>
