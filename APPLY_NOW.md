@@ -44,6 +44,7 @@ After running the SQL:
 ## Your Custom Template Included:
 
 Your custom HTML starting with:
+
 ```
 こんにちは！
 RaJA Halloween Cruise 事務局です。
@@ -67,4 +68,3 @@ This template is now saved in the database and will appear on all devices.
 
 The SQL file is: `apply_settings_migration.sql`  
 You can view/edit it before running if needed.
-

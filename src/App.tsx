@@ -34,8 +34,14 @@ function CheckinsView() {
       adult: number;
       child: number;
       infant: number;
+      absent_adults: number;
+      absent_children: number;
+      absent_infants: number;
+      absence_note: string;
     }>
   >([]);
+  const [absenceModalOpen, setAbsenceModalOpen] = useState<boolean>(false);
+  const [selectedRow, setSelectedRow] = useState<typeof rows[0] | null>(null);
 
   const EMAIL_REGEX = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
   function detectEmail(
@@ -199,6 +205,43 @@ function CheckinsView() {
     setRows((prev) => prev.filter((r) => r.row_hash !== row_hash));
   }
 
+  async function handleAbsence(
+    row_hash: string,
+    absentAdults: number,
+    absentChildren: number,
+    absentInfants: number,
+    absenceNote: string
+  ) {
+    const { error: updateErr } = await supabaseClient
+      .from("checkins")
+      .update({
+        absent_adults: absentAdults,
+        absent_children: absentChildren,
+        absent_infants: absentInfants,
+        absence_note: absenceNote,
+      })
+      .eq("row_hash", row_hash);
+    if (updateErr) {
+      alert(updateErr.message || String(updateErr));
+      return false;
+    }
+    // Update local state
+    setRows((prev) =>
+      prev.map((r) =>
+        r.row_hash === row_hash
+          ? {
+              ...r,
+              absent_adults: absentAdults,
+              absent_children: absentChildren,
+              absent_infants: absentInfants,
+              absence_note: absenceNote,
+            }
+          : r
+      )
+    );
+    return true;
+  }
+
   useEffect(() => {
     (async () => {
       try {
@@ -206,12 +249,16 @@ function CheckinsView() {
         setError("");
         const { data: checkins, error: cErr } = await supabaseClient
           .from("checkins")
-          .select("row_hash, checked_in_at")
+          .select("row_hash, checked_in_at, absent_adults, absent_children, absent_infants, absence_note")
           .order("checked_in_at", { ascending: false });
         if (cErr) throw cErr;
         const list = (checkins || []) as Array<{
           row_hash: string;
           checked_in_at: string;
+          absent_adults: number | null;
+          absent_children: number | null;
+          absent_infants: number | null;
+          absence_note: string | null;
         }>;
         if (list.length === 0) {
           setRows([]);
@@ -257,6 +304,10 @@ function CheckinsView() {
             adult,
             child,
             infant,
+            absent_adults: c.absent_adults || 0,
+            absent_children: c.absent_children || 0,
+            absent_infants: c.absent_infants || 0,
+            absence_note: c.absence_note || "",
           };
         });
         setRows(merged);
@@ -269,12 +320,183 @@ function CheckinsView() {
   }, [supabaseClient]);
 
   // Calculate total number of people (sum of all adult, child, and infant)
-  const totalPeople = rows.reduce((sum, row) => {
+  const totalCheckedIn = rows.reduce((sum, row) => {
     const adult = parseInt(String(row.adult || 0), 10) || 0;
     const child = parseInt(String(row.child || 0), 10) || 0;
     const infant = parseInt(String(row.infant || 0), 10) || 0;
     return sum + adult + child + infant;
   }, 0);
+
+  // Calculate actual attendance (checked in minus absences)
+  const totalActual = rows.reduce((sum, row) => {
+    const adult = parseInt(String(row.adult || 0), 10) || 0;
+    const child = parseInt(String(row.child || 0), 10) || 0;
+    const infant = parseInt(String(row.infant || 0), 10) || 0;
+    const absentAdult = parseInt(String(row.absent_adults || 0), 10) || 0;
+    const absentChild = parseInt(String(row.absent_children || 0), 10) || 0;
+    const absentInfant = parseInt(String(row.absent_infants || 0), 10) || 0;
+    return sum + (adult - absentAdult) + (child - absentChild) + (infant - absentInfant);
+  }, 0);
+
+  const totalAbsent = totalCheckedIn - totalActual;
+
+  // Absence Modal Component state
+  const [absentAdults, setAbsentAdults] = useState(0);
+  const [absentChildren, setAbsentChildren] = useState(0);
+  const [absentInfants, setAbsentInfants] = useState(0);
+  const [absenceNote, setAbsenceNote] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  // Update modal state when selectedRow changes
+  useEffect(() => {
+    if (selectedRow) {
+      setAbsentAdults(selectedRow.absent_adults);
+      setAbsentChildren(selectedRow.absent_children);
+      setAbsentInfants(selectedRow.absent_infants);
+      setAbsenceNote(selectedRow.absence_note);
+    }
+  }, [selectedRow]);
+
+  // Absence Modal Component
+  const AbsenceModal = () => {
+    if (!absenceModalOpen || !selectedRow) return null;
+
+    const handleSave = async () => {
+      // Validation
+      if (absentAdults > selectedRow.adult) {
+        alert(`欠席大人数（${absentAdults}）はチェックイン人数（${selectedRow.adult}）を超えられません`);
+        return;
+      }
+      if (absentChildren > selectedRow.child) {
+        alert(`欠席こども数（${absentChildren}）はチェックイン人数（${selectedRow.child}）を超えられません`);
+        return;
+      }
+      if (absentInfants > selectedRow.infant) {
+        alert(`欠席赤ちゃん数（${absentInfants}）はチェックイン人数（${selectedRow.infant}）を超えられません`);
+        return;
+      }
+
+      setSubmitting(true);
+      const success = await handleAbsence(
+        selectedRow.row_hash,
+        absentAdults,
+        absentChildren,
+        absentInfants,
+        absenceNote
+      );
+      setSubmitting(false);
+
+      if (success) {
+        setAbsenceModalOpen(false);
+        setSelectedRow(null);
+      }
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+          <h3 className="text-lg font-semibold mb-4 text-gray-900">
+            【欠席者登録】{selectedRow.name}様の家族
+          </h3>
+
+          <div className="mb-4 p-3 bg-gray-50 rounded">
+            <p className="text-sm text-gray-700 font-medium mb-2">チェックイン人数:</p>
+            <div className="text-sm text-gray-600 space-y-1">
+              <div>• 大人: {selectedRow.adult}名</div>
+              <div>• こども: {selectedRow.child}名</div>
+              <div>• 赤ちゃん: {selectedRow.infant}名</div>
+            </div>
+          </div>
+
+          <div className="space-y-4 mb-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                欠席大人数:
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  max={selectedRow.adult}
+                  value={absentAdults}
+                  onChange={(e) => setAbsentAdults(Math.max(0, Math.min(selectedRow.adult, parseInt(e.target.value) || 0)))}
+                  className="border border-gray-300 rounded px-3 py-2 w-24 text-center"
+                />
+                <span className="text-sm text-gray-600">/ {selectedRow.adult}名</span>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                欠席こども数:
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  max={selectedRow.child}
+                  value={absentChildren}
+                  onChange={(e) => setAbsentChildren(Math.max(0, Math.min(selectedRow.child, parseInt(e.target.value) || 0)))}
+                  className="border border-gray-300 rounded px-3 py-2 w-24 text-center"
+                />
+                <span className="text-sm text-gray-600">/ {selectedRow.child}名</span>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                欠席赤ちゃん数:
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  max={selectedRow.infant}
+                  value={absentInfants}
+                  onChange={(e) => setAbsentInfants(Math.max(0, Math.min(selectedRow.infant, parseInt(e.target.value) || 0)))}
+                  className="border border-gray-300 rounded px-3 py-2 w-24 text-center"
+                />
+                <span className="text-sm text-gray-600">/ {selectedRow.infant}名</span>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                理由 (任意):
+              </label>
+              <textarea
+                value={absenceNote}
+                onChange={(e) => setAbsenceNote(e.target.value)}
+                placeholder="例: 体調不良のため"
+                className="border border-gray-300 rounded px-3 py-2 w-full"
+                rows={2}
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              onClick={handleSave}
+              disabled={submitting}
+              className="flex-1 bg-indigo-600 text-white rounded px-4 py-2 font-medium hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {submitting ? "保存中..." : "保存"}
+            </button>
+            <button
+              onClick={() => {
+                setAbsenceModalOpen(false);
+                setSelectedRow(null);
+              }}
+              disabled={submitting}
+              className="flex-1 bg-gray-200 text-gray-800 rounded px-4 py-2 font-medium hover:bg-gray-300 disabled:opacity-50"
+            >
+              キャンセル
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="rounded-lg border bg-white p-6 shadow-sm">
@@ -282,9 +504,15 @@ function CheckinsView() {
         <h2 className="text-lg font-semibold">チェックイン済みの参加者</h2>
         <div className="flex items-center gap-4 text-sm text-gray-600">
           <span>登録済み家族数: {rows.length}</span>
+          <span>チェックイン総人数: {totalCheckedIn}</span>
           <span className="font-semibold text-indigo-700">
-            総参加人数: {totalPeople}
+            実際の参加人数: {totalActual}
           </span>
+          {totalAbsent > 0 && (
+            <span className="text-red-600 font-medium">
+              (欠席: {totalAbsent}名)
+            </span>
+          )}
         </div>
       </div>
       {loading ? (
@@ -321,37 +549,81 @@ function CheckinsView() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
-                <tr key={r.row_hash} className="odd:bg-white even:bg-gray-50">
-                  <td className="px-3 py-2 text-gray-800 whitespace-nowrap">
-                    {r.name}
-                  </td>
-                  <td className="px-3 py-2 text-gray-800 whitespace-nowrap">
-                    {r.phone}
-                  </td>
-                  <td className="px-3 py-2 text-gray-800 whitespace-nowrap">
-                    {r.adult}
-                  </td>
-                  <td className="px-3 py-2 text-gray-800 whitespace-nowrap">
-                    {r.child}
-                  </td>
-                  <td className="px-3 py-2 text-gray-800 whitespace-nowrap">
-                    {r.infant}
-                  </td>
-                  <td className="px-3 py-2 text-gray-800 whitespace-nowrap">
-                    <button
-                      onClick={() => handleRemove(r.row_hash)}
-                      className="rounded px-3 py-1 text-sm border text-red-700 border-red-300 bg-red-50 hover:bg-red-100"
-                    >
-                      削除
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {rows.map((r) => {
+                const actualAdult = r.adult - r.absent_adults;
+                const actualChild = r.child - r.absent_children;
+                const actualInfant = r.infant - r.absent_infants;
+                const hasAbsence = r.absent_adults > 0 || r.absent_children > 0 || r.absent_infants > 0;
+                
+                return (
+                  <tr key={r.row_hash} className="odd:bg-white even:bg-gray-50">
+                    <td className="px-3 py-2 text-gray-800 whitespace-nowrap">
+                      {r.name}
+                    </td>
+                    <td className="px-3 py-2 text-gray-800 whitespace-nowrap">
+                      {r.phone}
+                    </td>
+                    <td className="px-3 py-2 text-gray-800 whitespace-nowrap">
+                      {r.absent_adults > 0 ? (
+                        <span>
+                          <span className="text-gray-500 line-through">{r.adult}</span>
+                          {" → "}
+                          <span className="font-semibold">{actualAdult}</span>
+                        </span>
+                      ) : (
+                        r.adult
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-gray-800 whitespace-nowrap">
+                      {r.absent_children > 0 ? (
+                        <span>
+                          <span className="text-gray-500 line-through">{r.child}</span>
+                          {" → "}
+                          <span className="font-semibold">{actualChild}</span>
+                        </span>
+                      ) : (
+                        r.child
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-gray-800 whitespace-nowrap">
+                      {r.absent_infants > 0 ? (
+                        <span>
+                          <span className="text-gray-500 line-through">{r.infant}</span>
+                          {" → "}
+                          <span className="font-semibold">{actualInfant}</span>
+                        </span>
+                      ) : (
+                        r.infant
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-gray-800 whitespace-nowrap">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            setSelectedRow(r);
+                            setAbsenceModalOpen(true);
+                          }}
+                          className="rounded px-3 py-1 text-sm border text-orange-700 border-orange-300 bg-orange-50 hover:bg-orange-100"
+                          title={hasAbsence ? r.absence_note || "欠席登録済み" : "欠席登録"}
+                        >
+                          {hasAbsence ? "欠席編集" : "欠席登録"}
+                        </button>
+                        <button
+                          onClick={() => handleRemove(r.row_hash)}
+                          className="rounded px-3 py-1 text-sm border text-red-700 border-red-300 bg-red-50 hover:bg-red-100"
+                        >
+                          削除
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       )}
+      <AbsenceModal />
     </div>
   );
 }
