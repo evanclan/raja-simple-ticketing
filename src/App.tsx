@@ -670,7 +670,7 @@ function CheckinsView() {
                               : "欠席登録"
                           }
                         >
-                          {hasAbsence ? "欠席編集" : "欠席登録"}
+                          {hasAbsence ? "欠席" : "欠席登録"}
                         </button>
                         <button
                           onClick={() => handleRemove(r.row_hash)}
