@@ -550,10 +550,12 @@ function CheckinsView() {
   };
 
   return (
-    <div className="rounded-lg border bg-white p-6 shadow-sm">
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-lg font-semibold">チェックイン済みの参加者</h2>
-        <div className="flex items-center gap-4 text-sm text-gray-600">
+    <div className="rounded-none md:rounded-lg border-0 md:border bg-white p-2 md:p-6 shadow-none md:shadow-sm">
+      <div className="mb-3 flex flex-col md:flex-row items-start md:items-center justify-between gap-2">
+        <h2 className="text-base md:text-lg font-semibold">
+          チェックイン済みの参加者
+        </h2>
+        <div className="flex flex-wrap items-center gap-2 md:gap-4 text-xs md:text-sm text-gray-600">
           <span>登録済み家族数: {rows.length}</span>
           <span>チェックイン総人数: {totalCheckedIn}</span>
           <span className="font-semibold text-indigo-700">
@@ -575,7 +577,7 @@ function CheckinsView() {
       ) : rows.length === 0 ? (
         <div className="text-gray-600">No check-ins yet.</div>
       ) : (
-        <div className="table-scroll overflow-auto border rounded">
+        <div className="table-scroll overflow-auto border-0 md:border rounded-none md:rounded">
           <table className="min-w-full text-sm">
             <thead className="bg-red-50/60 border-b border-red-100">
               <tr>
@@ -1172,6 +1174,8 @@ export default function App() {
       row_hash: string;
       data: Record<string, any>;
       click_count?: number;
+      checked_in_at?: string | null;
+      entry_type?: string;
     }>
   >([]);
   const [paidHashes, setPaidHashes] = useState<Set<string>>(new Set());
@@ -2226,18 +2230,55 @@ This is your entry pass. Show this link at the entrance.
   async function loadPaidParticipants() {
     const { data, error } = await supabase
       .from("paidparticipants")
-      .select("row_number, row_hash, headers, data, click_count")
+      .select("row_number, row_hash, headers, data, click_count, entry_type")
       .order("row_number", { ascending: true });
     if (error) return; // silent
     const headersFromFirst =
       (data?.[0]?.headers as string[] | undefined) ?? paidHeaders;
     setPaidHeaders(headersFromFirst);
+
+    // Fetch check-in status for all paid participants
+    const rowHashes = (data ?? []).map((r: any) => r.row_hash);
+    let checkinsData: any[] = [];
+
+    // Only query checkins if we have row hashes
+    if (rowHashes.length > 0) {
+      const { data: checkins } = await supabase
+        .from("checkins")
+        .select("row_hash, checked_in_at")
+        .in("row_hash", rowHashes);
+      checkinsData = checkins || [];
+    }
+
+    // Create a map of row_hash to checked_in_at for quick lookup
+    const checkinMap = new Map<string, string | null>();
+    checkinsData.forEach((c: any) => {
+      checkinMap.set(c.row_hash, c.checked_in_at);
+    });
+
     const mapped = (data ?? []).map((r: any) => ({
       row_number: r.row_number as number,
       row_hash: r.row_hash as string,
       data: r.data as Record<string, any>,
       click_count: (r.click_count as number) || 0,
+      checked_in_at: checkinMap.get(r.row_hash) || null,
+      entry_type: (r.entry_type as string) || "paid",
     }));
+
+    // Debug: Log check-in status
+    console.log("Paid participants loaded:", mapped.length);
+    console.log(
+      "Checked-in participants:",
+      mapped.filter((r: any) => r.checked_in_at).length
+    );
+    console.log(
+      "Sample data:",
+      mapped.slice(0, 3).map((r: any) => ({
+        row_number: r.row_number,
+        checked_in_at: r.checked_in_at,
+      }))
+    );
+
     setPaidRows(mapped);
     setPaidHashes(new Set(mapped.map((r: any) => r.row_hash)));
   }
@@ -2272,6 +2313,7 @@ This is your entry pass. Show this link at the entrance.
             row_number: row.row_number,
             headers: tableHeaders,
             data: row.data,
+            entry_type: "paid",
           },
         ],
         { onConflict: "row_hash" }
@@ -2284,6 +2326,37 @@ This is your entry pass. Show this link at the entrance.
         e?.message || e?.error_description || e?.hint || String(e);
       alert(
         `Failed to mark as paid. ${message}\n\nEnsure table 'paidparticipants' exists with columns: row_hash text primary key, row_number int, headers jsonb, data jsonb (and RLS policies for authenticated users).`
+      );
+    }
+  }
+
+  async function handleFreeEntry(row: {
+    row_number: number;
+    row_hash: string;
+    data: Record<string, any>;
+  }) {
+    try {
+      // Upsert into paidparticipants with free entry type
+      const { error } = await supabase.from("paidparticipants").upsert(
+        [
+          {
+            row_hash: row.row_hash,
+            row_number: row.row_number,
+            headers: tableHeaders,
+            data: row.data,
+            entry_type: "free",
+          },
+        ],
+        { onConflict: "row_hash" }
+      );
+      if (error) throw error;
+      await loadPaidParticipants();
+    } catch (e: any) {
+      console.error(e);
+      const message =
+        e?.message || e?.error_description || e?.hint || String(e);
+      alert(
+        `Failed to add free entry. ${message}\n\nEnsure table 'paidparticipants' exists with columns: row_hash text primary key, row_number int, headers jsonb, data jsonb, entry_type text (and RLS policies for authenticated users).`
       );
     }
   }
@@ -2626,6 +2699,8 @@ This is your entry pass. Show this link at the entrance.
         `✓ チェックイン完了！\n✓ Check-in successful!\n\n${name} (${email})`
       );
       setResultMessage(`Manually checked in: ${name}`);
+      // Refresh paid participants list to update check-in status
+      loadPaidParticipants();
     } catch (e: any) {
       console.error(e);
       const message =
@@ -2793,7 +2868,11 @@ This is your entry pass. Show this link at the entrance.
           )}
         </div>
       </header>
-      <main className="mx-auto max-w-5xl px-4 py-10 space-y-6">
+      <main
+        className={`mx-auto max-w-5xl py-10 space-y-6 ${
+          isCheckinsRoute ? "px-0 md:px-4" : "px-4"
+        }`}
+      >
         {!isSupabaseConfigured && (
           <div className="rounded-lg border bg-white p-6 shadow-sm">
             <p className="text-red-700">
@@ -2842,7 +2921,13 @@ This is your entry pass. Show this link at the entrance.
             <p className="text-gray-600">読み込み中…</p>
           </div>
         ) : userEmail ? (
-          <div className="rounded-lg border bg-white p-6 shadow-sm">
+          <div
+            className={`bg-white ${
+              isCheckinsRoute
+                ? "rounded-none md:rounded-lg border-0 md:border shadow-none md:shadow-sm p-0 md:p-6"
+                : "rounded-lg border shadow-sm p-6"
+            }`}
+          >
             {!isCheckinsRoute && (
               <div className="mb-4 flex items-center justify-between">
                 <h2 className="text-lg font-semibold">
@@ -3291,19 +3376,34 @@ This is your entry pass. Show this link at the entrance.
                                 </td>
                               ))}
                               <td className="px-3 py-2 text-gray-800 whitespace-nowrap">
-                                <button
-                                  onClick={() => handleMarkPaid(r)}
-                                  disabled={paidHashes.has(r.row_hash)}
-                                  className={`rounded px-3 py-1 text-sm border ${
-                                    paidHashes.has(r.row_hash)
-                                      ? "text-green-700 border-green-300 bg-green-50 cursor-default"
-                                      : "text-indigo-700 border-indigo-300 bg-indigo-50 hover:bg-indigo-100"
-                                  }`}
-                                >
-                                  {paidHashes.has(r.row_hash)
-                                    ? "Paid"
-                                    : "Mark paid"}
-                                </button>
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => handleMarkPaid(r)}
+                                    disabled={paidHashes.has(r.row_hash)}
+                                    className={`rounded px-3 py-1 text-sm border ${
+                                      paidHashes.has(r.row_hash)
+                                        ? "text-green-700 border-green-300 bg-green-50 cursor-default"
+                                        : "text-indigo-700 border-indigo-300 bg-indigo-50 hover:bg-indigo-100"
+                                    }`}
+                                  >
+                                    {paidHashes.has(r.row_hash)
+                                      ? "✓ Added"
+                                      : "Mark paid"}
+                                  </button>
+                                  <button
+                                    onClick={() => handleFreeEntry(r)}
+                                    disabled={paidHashes.has(r.row_hash)}
+                                    className={`rounded px-3 py-1 text-sm border whitespace-nowrap ${
+                                      paidHashes.has(r.row_hash)
+                                        ? "text-green-700 border-green-300 bg-green-50 cursor-default"
+                                        : "text-blue-700 border-blue-300 bg-blue-50 hover:bg-blue-100"
+                                    }`}
+                                  >
+                                    {paidHashes.has(r.row_hash)
+                                      ? "✓ Added"
+                                      : "Free Entry"}
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           ))
@@ -3370,6 +3470,9 @@ This is your entry pass. Show this link at the entrance.
                             <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
                               #
                             </th>
+                            <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
+                              区分
+                            </th>
                             {displayPaidHeaders.map((h, idx) => (
                               <th
                                 key={`paid-${idx}-${h || ""}`}
@@ -3382,6 +3485,9 @@ This is your entry pass. Show this link at the entrance.
                               クリック数
                             </th>
                             <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
+                              チェックイン状態
+                            </th>
+                            <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
                               操作
                             </th>
                           </tr>
@@ -3390,7 +3496,7 @@ This is your entry pass. Show this link at the entrance.
                           {paidRows.length === 0 ? (
                             <tr>
                               <td
-                                colSpan={3 + displayPaidHeaders.length}
+                                colSpan={5 + displayPaidHeaders.length}
                                 className="px-3 py-4 text-center text-gray-500"
                               >
                                 No paid participants yet
@@ -3400,10 +3506,25 @@ This is your entry pass. Show this link at the entrance.
                             paidRows.map((r) => (
                               <tr
                                 key={`paid-${r.row_hash}`}
-                                className="odd:bg-white even:bg-gray-50"
+                                className={
+                                  r.checked_in_at
+                                    ? "bg-green-100 hover:bg-green-200"
+                                    : "odd:bg-white even:bg-gray-50"
+                                }
                               >
                                 <td className="px-3 py-2 text-gray-700 whitespace-nowrap">
                                   {r.row_number}
+                                </td>
+                                <td className="px-3 py-2 text-center whitespace-nowrap">
+                                  {r.entry_type === "free" ? (
+                                    <span className="inline-block px-2 py-1 rounded text-xs font-semibold bg-blue-100 text-blue-800">
+                                      無料 (Free)
+                                    </span>
+                                  ) : (
+                                    <span className="inline-block px-2 py-1 rounded text-xs font-semibold bg-gray-100 text-gray-600">
+                                      有料 (Paid)
+                                    </span>
+                                  )}
                                 </td>
                                 {displayPaidHeaders.map((h, idx) => (
                                   <td
@@ -3426,6 +3547,19 @@ This is your entry pass. Show this link at the entrance.
                                     }`}
                                   >
                                     {r.click_count || 0}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2 text-center whitespace-nowrap">
+                                  <span
+                                    className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
+                                      r.checked_in_at
+                                        ? "bg-green-100 text-green-800"
+                                        : "bg-gray-100 text-gray-600"
+                                    }`}
+                                  >
+                                    {r.checked_in_at
+                                      ? "✓ チェックイン済"
+                                      : "未チェックイン"}
                                   </span>
                                 </td>
                                 <td className="px-3 py-2 text-gray-800 whitespace-nowrap">
