@@ -1309,22 +1309,41 @@ This is your entry pass. Show this link at the entrance.
 {{url}}`;
     }
   });
-  const [entryPassPdf, setEntryPassPdf] = useState<File | null>(null);
-  const [entryPassPdfUrl, setEntryPassPdfUrl] = useState<string>(() => {
-    try {
-      return localStorage.getItem("entry_pass_pdf_url") || "";
-    } catch {
-      return "";
-    }
-  });
-  const [entryPassPdfBase64, setEntryPassPdfBase64] = useState<string>("");
-  const [entryPassPdfName, setEntryPassPdfName] = useState<string>("");
-  const [isBulkSendingPasses, setIsBulkSendingPasses] =
-    useState<boolean>(false);
+  // PDF attachment feature removed for reliability and to avoid request size limits
+  // const [entryPassPdf, setEntryPassPdf] = useState<File | null>(null);
+  // const [entryPassPdfUrl, setEntryPassPdfUrl] = useState<string>(() => {
+  //   try {
+  //     return localStorage.getItem("entry_pass_pdf_url") || "";
+  //   } catch {
+  //     return "";
+  //   }
+  // });
+  // const [entryPassPdfBase64, setEntryPassPdfBase64] = useState<string>("");
+  // const [entryPassPdfName, setEntryPassPdfName] = useState<string>("");
+
+  // Bulk send feature disabled - use individual send for better reliability
+  // const [isBulkSendingPasses, setIsBulkSendingPasses] = useState<boolean>(false);
+
   const [entryPassTestRecipient, setEntryPassTestRecipient] = useState<string>(
     "eoalferez@gmail.com"
   );
   const [isSendingTestPass, setIsSendingTestPass] = useState<boolean>(false);
+
+  // Daily send counter to track email usage (Resend limit: 100/day)
+  const [dailySendCount, setDailySendCount] = useState<number>(() => {
+    try {
+      const stored = localStorage.getItem("daily_send_count");
+      const lastDate = localStorage.getItem("daily_send_date");
+      const today = new Date().toDateString();
+
+      if (lastDate === today && stored) {
+        return parseInt(stored, 10) || 0;
+      }
+      return 0;
+    } catch {
+      return 0;
+    }
+  });
 
   // Calculation module state
   const [calcLoading, setCalcLoading] = useState<boolean>(false);
@@ -1473,12 +1492,12 @@ This is your entry pass. Show this link at the entrance.
 This is your entry pass. Show this link at the entrance.
 {{url}}`
       );
-      const epPdfUrl = await loadSetting("entry_pass_pdf_url", "");
+      // const epPdfUrl = await loadSetting("entry_pass_pdf_url", "");
 
       if (eps) setEntryPassSubject(eps);
       if (eph) setEntryPassHtml(eph);
       if (ept) setEntryPassText(ept);
-      if (epPdfUrl) setEntryPassPdfUrl(epPdfUrl);
+      // if (epPdfUrl) setEntryPassPdfUrl(epPdfUrl); // PDF feature removed
     })();
   }, [userToken]); // Load when user is authenticated
 
@@ -1503,12 +1522,12 @@ This is your entry pass. Show this link at the entrance.
       saveSetting("entry_pass_subject", entryPassSubject);
       saveSetting("entry_pass_html", entryPassHtml);
       saveSetting("entry_pass_text", entryPassText);
-      saveSetting("entry_pass_pdf_url", entryPassPdfUrl);
+      // saveSetting("entry_pass_pdf_url", entryPassPdfUrl); // PDF feature removed
     }, 500); // Debounce by 500ms to avoid saving on every keystroke
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entryPassSubject, entryPassHtml, entryPassText, entryPassPdfUrl]);
+  }, [entryPassSubject, entryPassHtml, entryPassText]);
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;
@@ -1586,9 +1605,9 @@ This is your entry pass. Show this link at the entrance.
             case "entry_pass_text":
               setEntryPassText(value);
               break;
-            case "entry_pass_pdf_url":
-              setEntryPassPdfUrl(value);
-              break;
+            // case "entry_pass_pdf_url": // PDF feature removed
+            //   setEntryPassPdfUrl(value);
+            //   break;
           }
         }
       )
@@ -1949,7 +1968,7 @@ This is your entry pass. Show this link at the entrance.
     localStorage.setItem("entry_pass_subject", entryPassSubject);
     localStorage.setItem("entry_pass_html", entryPassHtml);
     localStorage.setItem("entry_pass_text", entryPassText);
-    localStorage.setItem("entry_pass_pdf_url", entryPassPdfUrl);
+    // localStorage.setItem("entry_pass_pdf_url", entryPassPdfUrl); // PDF feature removed
   }
 
   function persistSentPasses(next: Set<string>) {
@@ -2536,9 +2555,10 @@ This is your entry pass. Show this link at the entrance.
           subject: entryPassSubject,
           html: entryPassHtml,
           text: entryPassText,
-          pdfUrl: entryPassPdfUrl || undefined,
-          pdfBase64: entryPassPdfBase64 || undefined,
-          pdfName: entryPassPdfName || undefined,
+          // PDF attachments removed for reliability
+          // pdfUrl: entryPassPdfUrl || undefined,
+          // pdfBase64: entryPassPdfBase64 || undefined,
+          // pdfName: entryPassPdfName || undefined,
         }),
       });
       if (!resp.ok) {
@@ -2553,6 +2573,13 @@ This is your entry pass. Show this link at the entrance.
         persistSentPasses(next);
         return next;
       });
+
+      // Update daily send counter
+      const newCount = dailySendCount + 1;
+      setDailySendCount(newCount);
+      const today = new Date().toDateString();
+      localStorage.setItem("daily_send_count", newCount.toString());
+      localStorage.setItem("daily_send_date", today);
     } catch (e: any) {
       alert(e?.message || String(e));
     } finally {
@@ -2711,6 +2738,9 @@ This is your entry pass. Show this link at the entrance.
     }
   }
 
+  // Bulk send feature disabled for better reliability and rate limit management
+  // Use individual send instead (one-by-one) to stay within Resend's 100/day limit
+  /*
   async function handleBulkSendPasses() {
     if (!confirm("Send entry pass email to all paid participants?")) return;
     try {
@@ -2733,9 +2763,6 @@ This is your entry pass. Show this link at the entrance.
           subject: entryPassSubject,
           html: entryPassHtml,
           text: entryPassText,
-          pdfUrl: entryPassPdfUrl || undefined,
-          pdfBase64: entryPassPdfBase64 || undefined,
-          pdfName: entryPassPdfName || undefined,
         }),
       });
       if (!resp.ok) {
@@ -2759,6 +2786,7 @@ This is your entry pass. Show this link at the entrance.
       setIsBulkSendingPasses(false);
     }
   }
+  */
 
   async function handleSendTestEntryPass() {
     try {
@@ -2793,9 +2821,10 @@ This is your entry pass. Show this link at the entrance.
           subject: entryPassSubject,
           html: entryPassHtml,
           text: entryPassText,
-          pdfUrl: entryPassPdfUrl || undefined,
-          pdfBase64: entryPassPdfBase64 || undefined,
-          pdfName: entryPassPdfName || undefined,
+          // PDF attachments removed for reliability
+          // pdfUrl: entryPassPdfUrl || undefined,
+          // pdfBase64: entryPassPdfBase64 || undefined,
+          // pdfName: entryPassPdfName || undefined,
         }),
       });
       if (!resp.ok) {
@@ -3085,9 +3114,41 @@ This is your entry pass. Show this link at the entrance.
             ) : activePage === "editEntryPass" ? (
               <div className="grid gap-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-medium">
-                    WEB チケット メール編集 (Web Ticket Email Editor)
-                  </h3>
+                  <div>
+                    <h3 className="font-medium">
+                      WEB チケット メール編集 (Web Ticket Email Editor)
+                    </h3>
+                    <div className="mt-2 flex items-center gap-2">
+                      <span
+                        className={`text-sm font-medium ${
+                          dailySendCount >= 90
+                            ? "text-red-600"
+                            : dailySendCount >= 70
+                            ? "text-orange-600"
+                            : "text-green-600"
+                        }`}
+                      >
+                        今日の送信数: {dailySendCount} / 100
+                      </span>
+                      {dailySendCount >= 90 && (
+                        <span className="text-xs text-red-600">
+                          (⚠️ 上限間近)
+                        </span>
+                      )}
+                      <button
+                        onClick={() => {
+                          setDailySendCount(0);
+                          localStorage.removeItem("daily_send_count");
+                          localStorage.removeItem("daily_send_date");
+                          alert("カウンターをリセットしました");
+                        }}
+                        className="text-xs text-gray-500 hover:text-gray-700 underline"
+                        title="手動でリセット (通常は自動でリセットされます)"
+                      >
+                        リセット
+                      </button>
+                    </div>
+                  </div>
                   <button
                     onClick={() => setActivePage("main")}
                     className="rounded border px-3 py-1 text-sm text-indigo-700 border-indigo-300 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-400"
@@ -3146,61 +3207,19 @@ This is your entry pass. Show this link at the entrance.
                       onChange={(e) => setEntryPassSubject(e.target.value)}
                     />
                   </label>
+                  {/* PDF attachment feature removed for reliability and to avoid request size limits */}
+                  {/* 
                   <label className="block">
                     <span className="text-sm text-gray-700">
-                      PDF添付 (Event Day Instructions)
+                      PDF添付 (Event Day Instructions) - Disabled
                     </span>
-                    <div className="mt-1 space-y-2">
-                      <input
-                        type="file"
-                        accept=".pdf"
-                        onChange={async (e) => {
-                          const file = e.target.files?.[0];
-                          if (file && file.type === "application/pdf") {
-                            setEntryPassPdf(file);
-                            setEntryPassPdfName(file.name);
-
-                            // Convert PDF to base64 for sending to backend
-                            try {
-                              const arrayBuffer = await file.arrayBuffer();
-                              const base64 = btoa(
-                                String.fromCharCode(
-                                  ...new Uint8Array(arrayBuffer)
-                                )
-                              );
-                              setEntryPassPdfBase64(base64);
-
-                              // Clear URL since we're using base64 now
-                              setEntryPassPdfUrl("");
-                            } catch (error) {
-                              console.error(
-                                "Error converting PDF to base64:",
-                                error
-                              );
-                              alert(
-                                "PDFファイルの処理中にエラーが発生しました"
-                              );
-                            }
-                          } else {
-                            alert("PDFファイルを選択してください");
-                          }
-                        }}
-                        className="w-full rounded border px-3 py-2"
-                      />
-                      {entryPassPdf && (
-                        <div className="text-sm text-green-600">
-                          選択済み: {entryPassPdf.name}
-                        </div>
-                      )}
-                      <input
-                        type="url"
-                        placeholder="または PDF の URL を入力"
-                        value={entryPassPdfUrl}
-                        onChange={(e) => setEntryPassPdfUrl(e.target.value)}
-                        className="w-full rounded border px-3 py-2"
-                      />
+                    <div className="mt-1 p-3 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
+                      PDF添付機能は無効化されました。信頼性向上のため、PDFは別途送信してください。
+                      <br />
+                      PDF attachment disabled for reliability. Send PDFs separately if needed.
                     </div>
                   </label>
+                  */}
                   <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                     <label className="block">
                       <span className="text-sm text-gray-700">HTML本文</span>
@@ -3452,15 +3471,16 @@ This is your entry pass. Show this link at the entrance.
                         >
                           領収書を全削除
                         </button>
+                        {/* Bulk send button removed - use individual send for better reliability and rate limit management */}
+                        {/* 
                         <button
                           onClick={handleBulkSendPasses}
                           disabled={true}
                           className="rounded border px-3 py-1 text-sm text-purple-700 border-purple-300 bg-purple-50 hover:bg-purple-100 disabled:opacity-50"
                         >
-                          {isBulkSendingPasses
-                            ? "送信中…"
-                            : "WEB チケットを一括送信"}
+                          WEB チケットを一括送信 (無効)
                         </button>
+                        */}
                       </div>
                     </div>
                     <div className="table-scroll overflow-auto border rounded">
