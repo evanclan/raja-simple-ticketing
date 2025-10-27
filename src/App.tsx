@@ -1737,17 +1737,20 @@ This is your entry pass. Show this link at the entrance.
 
   // Filter paid headers based on simple mode toggle
   const displayPaidHeaders = useMemo(() => {
-    if (!simpleModeForPaid) return paidHeaders;
+    // Always filter out タイムスタンプ column
+    const headers = paidHeaders.filter((h) => h !== "タイムスタンプ");
+
+    if (!simpleModeForPaid) return headers;
 
     // Find the indices of the columns to hide
-    const startIdx = paidHeaders.findIndex((h) => h === "フリガナ");
-    const endIdx = paidHeaders.findIndex((h) => h === "園児（利用者）氏名");
+    const startIdx = headers.findIndex((h) => h === "フリガナ");
+    const endIdx = headers.findIndex((h) => h === "園児（利用者）氏名");
 
     // If either column is not found, return all headers
-    if (startIdx === -1 || endIdx === -1) return paidHeaders;
+    if (startIdx === -1 || endIdx === -1) return headers;
 
     // Filter out columns from startIdx to endIdx (inclusive)
-    return paidHeaders.filter((_, idx) => idx < startIdx || idx > endIdx);
+    return headers.filter((_, idx) => idx < startIdx || idx > endIdx);
   }, [paidHeaders, simpleModeForPaid]);
 
   // Attempt to auto-detect adult/child header keys from current headers
