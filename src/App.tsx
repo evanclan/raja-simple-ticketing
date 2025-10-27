@@ -3387,8 +3387,8 @@ This is your entry pass. Show this link at the entrance.
                                     }`}
                                   >
                                     {paidHashes.has(r.row_hash)
-                                      ? "✓ Added"
-                                      : "Mark paid"}
+                                      ? "追加した"
+                                      : "払った"}
                                   </button>
                                   <button
                                     onClick={() => handleFreeEntry(r)}
@@ -3400,8 +3400,8 @@ This is your entry pass. Show this link at the entrance.
                                     }`}
                                   >
                                     {paidHashes.has(r.row_hash)
-                                      ? "✓ Added"
-                                      : "Free Entry"}
+                                      ? "追加した"
+                                      : "無料"}
                                   </button>
                                 </div>
                               </td>
