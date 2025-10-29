@@ -321,6 +321,122 @@ function CheckinsView() {
     })();
   }, [supabaseClient]);
 
+  // Real-time subscription for check-ins list updates
+  useEffect(() => {
+    const channel = supabaseClient
+      .channel("checkins-realtime")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "checkins",
+        },
+        async (payload: any) => {
+          // When a new check-in occurs, fetch its details and add to list
+          const newCheckin = payload.new as {
+            row_hash: string;
+            checked_in_at: string;
+            absent_adults: number | null;
+            absent_children: number | null;
+            absent_infants: number | null;
+            absence_note: string | null;
+          };
+
+          // Fetch participant details
+          const { data: participant } = await supabaseClient
+            .from("paidparticipants")
+            .select("row_hash, row_number, headers, data")
+            .eq("row_hash", newCheckin.row_hash)
+            .single();
+
+          if (participant) {
+            const headers = (participant as any).headers || [];
+            const data = (participant as any).data || {};
+
+            const newRow = {
+              row_hash: newCheckin.row_hash,
+              email: detectEmail(headers, data),
+              name: detectName(headers, data),
+              phone: detectPhone(headers, data),
+              category: detectCategory(headers, data),
+              adult: parseCount(
+                detectAdultKey(headers)
+                  ? data[detectAdultKey(headers)!]
+                  : undefined
+              ),
+              child: parseCount(
+                detectChildKey(headers)
+                  ? data[detectChildKey(headers)!]
+                  : undefined
+              ),
+              infant: parseCount(
+                detectInfantKey(headers)
+                  ? data[detectInfantKey(headers)!]
+                  : undefined
+              ),
+              absent_adults: newCheckin.absent_adults || 0,
+              absent_children: newCheckin.absent_children || 0,
+              absent_infants: newCheckin.absent_infants || 0,
+              absence_note: newCheckin.absence_note || "",
+            };
+
+            // Add to the top of the list (newest first)
+            setRows((prev) => [newRow, ...prev]);
+          }
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "checkins",
+        },
+        (payload: any) => {
+          const deletedHash = (payload.old as any).row_hash;
+          setRows((prev) => prev.filter((r) => r.row_hash !== deletedHash));
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "checkins",
+        },
+        (payload: any) => {
+          const updated = payload.new as {
+            row_hash: string;
+            absent_adults: number | null;
+            absent_children: number | null;
+            absent_infants: number | null;
+            absence_note: string | null;
+          };
+          // Update absence info in real-time
+          setRows((prev) =>
+            prev.map((r) =>
+              r.row_hash === updated.row_hash
+                ? {
+                    ...r,
+                    absent_adults: updated.absent_adults || 0,
+                    absent_children: updated.absent_children || 0,
+                    absent_infants: updated.absent_infants || 0,
+                    absence_note: updated.absence_note || "",
+                  }
+                : r
+            )
+          );
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscription when component unmounts
+    return () => {
+      supabaseClient.removeChannel(channel);
+    };
+  }, [supabaseClient]);
+
   // Calculate total number of people (sum of all adult, child, and infant)
   const totalCheckedIn = rows.reduce((sum, row) => {
     const adult = parseInt(String(row.adult || 0), 10) || 0;
