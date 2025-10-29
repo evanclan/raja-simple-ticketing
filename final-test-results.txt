@@ -1,0 +1,138 @@
+Starting load test with 100 concurrent users...
+Target: https://qhpnjpjotcehjabfdovp.supabase.co/functions/v1/entry_pass
+
+❌ User 2: Failed - HTTP 400 (1120ms)
+❌ User 19: Failed - HTTP 400 (1050ms)
+❌ User 1: Failed - HTTP 400 (1297ms)
+❌ User 17: Failed - HTTP 400 (1063ms)
+❌ User 31: Failed - HTTP 400 (1048ms)
+❌ User 5: Failed - HTTP 400 (1795ms)
+❌ User 16: Failed - HTTP 400 (1800ms)
+❌ User 46: Failed - HTTP 400 (1779ms)
+❌ User 13: Failed - HTTP 400 (1810ms)
+❌ User 54: Failed - HTTP 400 (1778ms)
+❌ User 67: Failed - HTTP 400 (1758ms)
+❌ User 71: Failed - HTTP 400 (1756ms)
+❌ User 68: Failed - HTTP 400 (1759ms)
+❌ User 72: Failed - HTTP 400 (1759ms)
+❌ User 77: Failed - HTTP 400 (1757ms)
+❌ User 84: Failed - HTTP 400 (1745ms)
+❌ User 78: Failed - HTTP 400 (1758ms)
+❌ User 89: Failed - HTTP 400 (1747ms)
+❌ User 93: Failed - HTTP 400 (1752ms)
+❌ User 75: Failed - HTTP 400 (1770ms)
+❌ User 73: Failed - HTTP 400 (1772ms)
+❌ User 98: Failed - HTTP 400 (1755ms)
+❌ User 90: Failed - HTTP 400 (1758ms)
+❌ User 95: Failed - HTTP 400 (1758ms)
+❌ User 76: Failed - HTTP 400 (1774ms)
+❌ User 82: Failed - HTTP 400 (1763ms)
+❌ User 86: Failed - HTTP 400 (1763ms)
+❌ User 74: Failed - HTTP 400 (1779ms)
+❌ User 69: Failed - HTTP 400 (1784ms)
+❌ User 85: Failed - HTTP 400 (1765ms)
+❌ User 91: Failed - HTTP 400 (1765ms)
+❌ User 79: Failed - HTTP 400 (1773ms)
+❌ User 99: Failed - HTTP 400 (1764ms)
+❌ User 87: Failed - HTTP 400 (1768ms)
+❌ User 97: Failed - HTTP 400 (1767ms)
+❌ User 70: Failed - HTTP 400 (1788ms)
+❌ User 80: Failed - HTTP 400 (1773ms)
+❌ User 100: Failed - HTTP 400 (1768ms)
+❌ User 94: Failed - HTTP 400 (1770ms)
+❌ User 92: Failed - HTTP 400 (1772ms)
+❌ User 88: Failed - HTTP 400 (1774ms)
+❌ User 83: Failed - HTTP 400 (1777ms)
+❌ User 96: Failed - HTTP 400 (1776ms)
+❌ User 81: Failed - HTTP 400 (1781ms)
+❌ User 20: Failed - HTTP 400 (1849ms)
+❌ User 56: Failed - HTTP 400 (1823ms)
+❌ User 52: Failed - HTTP 400 (1828ms)
+❌ User 58: Failed - HTTP 400 (1824ms)
+❌ User 61: Failed - HTTP 400 (1818ms)
+❌ User 49: Failed - HTTP 400 (1832ms)
+❌ User 36: Failed - HTTP 400 (1836ms)
+❌ User 47: Failed - HTTP 400 (1834ms)
+❌ User 14: Failed - HTTP 400 (1899ms)
+❌ User 7: Failed - HTTP 400 (1952ms)
+❌ User 11: Failed - HTTP 400 (1918ms)
+❌ User 29: Failed - HTTP 400 (1891ms)
+❌ User 37: Failed - HTTP 400 (1882ms)
+❌ User 38: Failed - HTTP 400 (1882ms)
+❌ User 41: Failed - HTTP 400 (1883ms)
+❌ User 33: Failed - HTTP 400 (1886ms)
+❌ User 45: Failed - HTTP 400 (1905ms)
+❌ User 3: Failed - HTTP 400 (2007ms)
+❌ User 26: Failed - HTTP 400 (1932ms)
+❌ User 25: Failed - HTTP 400 (1934ms)
+❌ User 28: Failed - HTTP 400 (1932ms)
+❌ User 4: Failed - HTTP 400 (2010ms)
+❌ User 22: Failed - HTTP 400 (1937ms)
+❌ User 15: Failed - HTTP 400 (1939ms)
+❌ User 9: Failed - HTTP 400 (1989ms)
+❌ User 53: Failed - HTTP 400 (1913ms)
+❌ User 30: Failed - HTTP 400 (1924ms)
+❌ User 39: Failed - HTTP 400 (1927ms)
+❌ User 32: Failed - HTTP 400 (1930ms)
+❌ User 18: Failed - HTTP 400 (1951ms)
+❌ User 6: Failed - HTTP 400 (2008ms)
+❌ User 21: Failed - HTTP 400 (1973ms)
+❌ User 34: Failed - HTTP 400 (1955ms)
+❌ User 24: Failed - HTTP 400 (1975ms)
+❌ User 12: Failed - HTTP 400 (2009ms)
+❌ User 23: Failed - HTTP 400 (2019ms)
+❌ User 44: Failed - HTTP 400 (2000ms)
+❌ User 8: Failed - HTTP 400 (2074ms)
+❌ User 27: Failed - HTTP 400 (2022ms)
+❌ User 35: Failed - HTTP 400 (2008ms)
+❌ User 10: Failed - HTTP 400 (2049ms)
+❌ User 51: Failed - HTTP 400 (2008ms)
+❌ User 55: Failed - HTTP 400 (2005ms)
+❌ User 42: Failed - HTTP 400 (2014ms)
+❌ User 50: Failed - HTTP 400 (2033ms)
+❌ User 59: Failed - HTTP 400 (2027ms)
+❌ User 60: Failed - HTTP 400 (2027ms)
+❌ User 48: Failed - HTTP 400 (2035ms)
+❌ User 64: Failed - HTTP 400 (2013ms)
+❌ User 65: Failed - HTTP 400 (2014ms)
+❌ User 57: Failed - HTTP 400 (2030ms)
+❌ User 62: Failed - HTTP 400 (2031ms)
+❌ User 43: Failed - HTTP 400 (2055ms)
+❌ User 66: Failed - HTTP 400 (2029ms)
+❌ User 40: Failed - HTTP 400 (2060ms)
+❌ User 63: Failed - HTTP 400 (2038ms)
+
+======================================================================
+LOAD TEST RESULTS
+======================================================================
+Test Configuration:
+  Concurrent Users: 100
+  Endpoint: https://qhpnjpjotcehjabfdovp.supabase.co/functions/v1/entry_pass
+  Test Token: Not provided (will fail)
+
+Summary:
+  Total Requests: 100
+  Successful: 0 (0.00%)
+  Failed: 100
+  Timeouts: 0
+  Duration: 2.33s
+  Requests/sec: 42.90
+
+Response Times:
+  Min: 1048ms
+  Average: 1842ms
+  Median: 1836ms
+  95th percentile: 2038ms
+  99th percentile: 2074ms
+  Max: 2074ms
+
+Error Breakdown:
+  HTTP 400: 100 times
+
+Assessment:
+  ❌ NEEDS IMPROVEMENT - Issues detected, see recommendations below
+
+Recommendations:
+  - High failure rate. Check Edge Function logs.
+  - Verify ENTRY_JWT_SECRET is set correctly.
+======================================================================

@@ -323,6 +323,7 @@ function CheckinsView() {
 
   // Real-time subscription for check-ins list updates
   useEffect(() => {
+    console.log("🔄 Setting up realtime subscription for checkins...");
     const channel = supabaseClient
       .channel("checkins-realtime")
       .on(
@@ -333,6 +334,7 @@ function CheckinsView() {
           table: "checkins",
         },
         async (payload: any) => {
+          console.log("✨ New check-in detected via realtime:", payload);
           // When a new check-in occurs, fetch its details and add to list
           const newCheckin = payload.new as {
             row_hash: string;
@@ -383,6 +385,7 @@ function CheckinsView() {
 
             // Add to the top of the list (newest first)
             setRows((prev) => [newRow, ...prev]);
+            console.log("✅ Added new check-in to list:", newRow.name);
           }
         }
       )
@@ -394,6 +397,7 @@ function CheckinsView() {
           table: "checkins",
         },
         (payload: any) => {
+          console.log("🗑️ Check-in deleted via realtime:", payload);
           const deletedHash = (payload.old as any).row_hash;
           setRows((prev) => prev.filter((r) => r.row_hash !== deletedHash));
         }
@@ -406,6 +410,7 @@ function CheckinsView() {
           table: "checkins",
         },
         (payload: any) => {
+          console.log("🔄 Check-in updated via realtime:", payload);
           const updated = payload.new as {
             row_hash: string;
             absent_adults: number | null;
@@ -429,10 +434,18 @@ function CheckinsView() {
           );
         }
       )
-      .subscribe();
+      .subscribe((status: string) => {
+        console.log("📡 Realtime subscription status:", status);
+        if (status === "SUBSCRIBED") {
+          console.log("✅ Successfully subscribed to realtime updates!");
+        } else if (status === "CHANNEL_ERROR") {
+          console.error("❌ Realtime subscription error - check if Realtime is enabled in Supabase dashboard");
+        }
+      });
 
     // Cleanup subscription when component unmounts
     return () => {
+      console.log("🔌 Cleaning up realtime subscription");
       supabaseClient.removeChannel(channel);
     };
   }, [supabaseClient]);
