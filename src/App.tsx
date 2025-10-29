@@ -439,7 +439,9 @@ function CheckinsView() {
         if (status === "SUBSCRIBED") {
           console.log("✅ Successfully subscribed to realtime updates!");
         } else if (status === "CHANNEL_ERROR") {
-          console.error("❌ Realtime subscription error - check if Realtime is enabled in Supabase dashboard");
+          console.error(
+            "❌ Realtime subscription error - check if Realtime is enabled in Supabase dashboard"
+          );
         }
       });
 
@@ -1296,12 +1298,14 @@ export default function App() {
 
   // Paid participants view state
   const [simpleModeForPaid, setSimpleModeForPaid] = useState<boolean>(true); // Toggle for hiding columns in paid table
+  const [searchQueryPaid, setSearchQueryPaid] = useState<string>("");
   const [paidHeaders, setPaidHeaders] = useState<string[]>([]);
   const [paidRows, setPaidRows] = useState<
     Array<{
       row_number: number;
       row_hash: string;
       data: Record<string, any>;
+      headers?: string[];
       click_count?: number;
       checked_in_at?: string | null;
       entry_type?: string;
@@ -1882,6 +1886,29 @@ This is your entry pass. Show this link at the entrance.
     return headers.filter((_, idx) => idx < startIdx || idx > endIdx);
   }, [paidHeaders, simpleModeForPaid]);
 
+  // Filter paid rows based on search query
+  const filteredPaidRows = useMemo(() => {
+    if (!searchQueryPaid) return paidRows;
+    const query = searchQueryPaid.toLowerCase();
+    return paidRows.filter((row) => {
+      // match row number
+      if (String(row.row_number).toLowerCase().includes(query)) return true;
+      // match any displayed cell value
+      for (const header of paidHeaders) {
+        const val = row.data?.[header];
+        if (val && String(val).toLowerCase().includes(query)) {
+          return true;
+        }
+      }
+      // match entry type
+      if (row.entry_type && String(row.entry_type).toLowerCase().includes(query)) return true;
+      // match check-in status
+      if (row.checked_in_at && "チェックイン".includes(query)) return true;
+      if (!row.checked_in_at && "未チェックイン".includes(query)) return true;
+      return false;
+    });
+  }, [paidRows, paidHeaders, searchQueryPaid]);
+
   // Attempt to auto-detect adult/child header keys from current headers
   useEffect(() => {
     if (!tableHeaders || tableHeaders.length === 0) return;
@@ -2023,6 +2050,61 @@ This is your entry pass. Show this link at the entrance.
       }
     }
     return undefined;
+  }
+
+  function detectAdultKey(headers: string[] | null | undefined): string | null {
+    const list = (headers || []).map((h) => String(h || ""));
+    for (const header of list) {
+      const h = header.toLowerCase();
+      if (
+        [
+          "おとな",
+          "大人",
+          "成人",
+          "中学生以上",
+          "おとな参加人数",
+          "adult",
+        ].some((p) => h.includes(p))
+      )
+        return header;
+    }
+    return null;
+  }
+
+  function detectChildKey(headers: string[] | null | undefined): string | null {
+    const list = (headers || []).map((h) => String(h || ""));
+    for (const header of list) {
+      const h = header.toLowerCase();
+      if (
+        [
+          "こども",
+          "子ども",
+          "子供",
+          "小学生",
+          "年少",
+          "こども参加人数",
+          "child",
+        ].some((p) => h.includes(p))
+      )
+        return header;
+    }
+    return null;
+  }
+
+  function detectInfantKey(
+    headers: string[] | null | undefined
+  ): string | null {
+    const list = (headers || []).map((h) => String(h || ""));
+    for (const header of list) {
+      const h = header.toLowerCase();
+      if (
+        ["年少々以下", "未就学", "幼児", "乳幼児", "未就園"].some((p) =>
+          h.includes(p)
+        )
+      )
+        return header;
+    }
+    return null;
   }
 
   function renderTemplate(template: string, vars: Record<string, any>): string {
@@ -2411,6 +2493,7 @@ This is your entry pass. Show this link at the entrance.
       row_number: r.row_number as number,
       row_hash: r.row_hash as string,
       data: r.data as Record<string, any>,
+      headers: r.headers as string[],
       click_count: (r.click_count as number) || 0,
       checked_in_at: checkinMap.get(r.row_hash) || null,
       entry_type: (r.entry_type as string) || "paid",
@@ -2798,6 +2881,7 @@ This is your entry pass. Show this link at the entrance.
     row_number: number;
     row_hash: string;
     data: Record<string, any>;
+    headers?: string[];
   }) {
     try {
       if (!userToken) {
@@ -2807,6 +2891,20 @@ This is your entry pass. Show this link at the entrance.
 
       const email = findEmailForRow(row.data);
       const name = findNameForRow(row.data) || "";
+
+      // Get participant counts
+      const headers = row.headers || [];
+      const adultKey = detectAdultKey(headers);
+      const childKey = detectChildKey(headers);
+      const infantKey = detectInfantKey(headers);
+      const adultCount = parseCount(adultKey ? row.data[adultKey] : undefined);
+      const childCount = parseCount(childKey ? row.data[childKey] : undefined);
+      const infantCount = parseCount(
+        infantKey ? row.data[infantKey] : undefined
+      );
+
+      // Build participant count info
+      const participantInfo = `大人: ${adultCount}\n子供: ${childCount}\n赤ちゃん: ${infantCount}`;
 
       // Check if already checked in
       const { data: existingCheckin, error: checkError } = await supabase
@@ -2833,7 +2931,7 @@ This is your entry pass. Show this link at the entrance.
       } else {
         if (
           !confirm(
-            `⚠️ 手動チェックインの確認 / CONFIRMATION ⚠️\n\nこの操作でこの参加者をチェックインします。\nThis will check in the following participant:\n\n${name}\n${email}\n\n実行しますか？\nProceed with manual check-in?`
+            `⚠️ 手動チェックインの確認 / CONFIRMATION ⚠️\n\nこの操作でこの参加者をチェックインします。\nThis will check in the following participant:\n\n${name}\n${email}\n\n${participantInfo}\n\n実行しますか？\nProceed with manual check-in?`
           )
         ) {
           return;
@@ -3579,6 +3677,13 @@ This is your entry pass. Show this link at the entrance.
                         >
                           簡単モード
                         </button>
+                        <input
+                          type="text"
+                          value={searchQueryPaid}
+                          onChange={(e) => setSearchQueryPaid(e.target.value)}
+                          placeholder="このページを検索…"
+                          className="rounded border px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-300"
+                        />
                         <button
                           onClick={loadPaidParticipants}
                           className="rounded border px-3 py-1 text-sm text-indigo-700 border-indigo-300 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-300"
@@ -3645,17 +3750,17 @@ This is your entry pass. Show this link at the entrance.
                           </tr>
                         </thead>
                         <tbody>
-                          {paidRows.length === 0 ? (
+                          {filteredPaidRows.length === 0 ? (
                             <tr>
                               <td
                                 colSpan={5 + displayPaidHeaders.length}
                                 className="px-3 py-4 text-center text-gray-500"
                               >
-                                No paid participants yet
+                                {paidRows.length === 0 ? "No paid participants yet" : "No results found"}
                               </td>
                             </tr>
                           ) : (
-                            paidRows.map((r) => (
+                            filteredPaidRows.map((r) => (
                               <tr
                                 key={`paid-${r.row_hash}`}
                                 className={
