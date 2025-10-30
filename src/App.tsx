@@ -2815,8 +2815,37 @@ This is your entry pass. Show this link at the entrance.
     data: Record<string, any>;
   }) {
     try {
-      const baseUrl = "https://raja-ticketing-s.vercel.app";
-      const ticketUrl = `${baseUrl}/?p=${row.row_hash}`;
+      if (!userToken) {
+        alert("Please sign in first");
+        return;
+      }
+
+      // Call backend to generate the actual JWT-based URL (same as email sending)
+      const baseUrl = window.location.origin;
+      const resp = await fetch(`${supabaseUrl}/functions/v1/entry_pass`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${userToken}`,
+        },
+        body: JSON.stringify({
+          action: "generate_link",
+          row_hash: row.row_hash,
+          baseUrl,
+        }),
+      });
+
+      if (!resp.ok) {
+        const txt = await resp.text();
+        throw new Error(`HTTP ${resp.status}: ${txt}`);
+      }
+
+      const data = await resp.json();
+      const ticketUrl = data.url;
+
+      if (!ticketUrl) {
+        throw new Error("No URL returned from server");
+      }
 
       await navigator.clipboard.writeText(ticketUrl);
 
@@ -2828,7 +2857,7 @@ This is your entry pass. Show this link at the entrance.
 
       setResultMessage(`URL copied: ${ticketUrl}`);
     } catch (e: any) {
-      alert(`Failed to copy: ${e?.message || String(e)}`);
+      alert(`Failed to copy URL: ${e?.message || String(e)}`);
     }
   }
 
