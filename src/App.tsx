@@ -1295,6 +1295,7 @@ export default function App() {
   const [hasMore, setHasMore] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [simpleMode, setSimpleMode] = useState<boolean>(true); // Toggle for hiding columns
+  const [showLatestImported, setShowLatestImported] = useState<boolean>(true); // Toggle for showing/hiding Latest imported rows table
 
   // Paid participants view state
   const [simpleModeForPaid, setSimpleModeForPaid] = useState<boolean>(true); // Toggle for hiding columns in paid table
@@ -3601,6 +3602,14 @@ This is your entry pass. Show this link at the entrance.
                     <h3 className="font-medium">Latest imported rows</h3>
                     <div className="flex items-center gap-2">
                       <button
+                        onClick={() =>
+                          setShowLatestImported(!showLatestImported)
+                        }
+                        className="rounded border px-3 py-1 text-sm whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-300 text-indigo-700 border-indigo-300 bg-white hover:bg-indigo-50"
+                      >
+                        {showLatestImported ? "非表示" : "表示"}
+                      </button>
+                      <button
                         onClick={() => setSimpleMode(!simpleMode)}
                         className={`rounded border px-3 py-1 text-sm whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-indigo-300 ${
                           simpleMode
@@ -3634,91 +3643,93 @@ This is your entry pass. Show this link at the entrance.
                       </button>
                     </div>
                   </div>
-                  <div className="table-scroll overflow-auto border rounded">
-                    <table className="min-w-full text-sm">
-                      <thead className="bg-red-50/60 border-b border-red-100">
-                        <tr>
-                          <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
-                            #
-                          </th>
-                          {displayHeaders.map((h, idx) => (
-                            <th
-                              key={`${h || ""}-${idx}`}
-                              className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap"
-                            >
-                              {h || "(empty)"}
-                            </th>
-                          ))}
-                          <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
-                            操作
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredRows.length === 0 ? (
+                  {showLatestImported && (
+                    <div className="table-scroll overflow-auto border rounded">
+                      <table className="min-w-full text-sm">
+                        <thead className="bg-red-50/60 border-b border-red-100">
                           <tr>
-                            <td
-                              colSpan={2 + displayHeaders.length}
-                              className="px-3 py-4 text-center text-gray-500"
-                            >
-                              データがありません
-                            </td>
+                            <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
+                              #
+                            </th>
+                            {displayHeaders.map((h, idx) => (
+                              <th
+                                key={`${h || ""}-${idx}`}
+                                className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap"
+                              >
+                                {h || "(empty)"}
+                              </th>
+                            ))}
+                            <th className="px-3 py-2 text-left text-indigo-700 whitespace-nowrap">
+                              操作
+                            </th>
                           </tr>
-                        ) : (
-                          filteredRows.map((r) => (
-                            <tr
-                              key={r.row_hash || r.row_number}
-                              className="odd:bg-white even:bg-gray-50"
-                            >
-                              <td className="px-3 py-2 text-gray-700 whitespace-nowrap">
-                                {r.row_number}
-                              </td>
-                              {displayHeaders.map((h, idx) => (
-                                <td
-                                  key={`${r.row_number}-${idx}`}
-                                  className="px-3 py-2 text-gray-800 whitespace-nowrap"
-                                >
-                                  {String(
-                                    r.data?.[h || `col_${idx + 1}`] ?? ""
-                                  )}
-                                </td>
-                              ))}
-                              <td className="px-3 py-2 text-gray-800 whitespace-nowrap">
-                                <div className="flex gap-2">
-                                  <button
-                                    onClick={() => handleMarkPaid(r)}
-                                    disabled={paidHashes.has(r.row_hash)}
-                                    className={`rounded px-3 py-1 text-sm border ${
-                                      paidHashes.has(r.row_hash)
-                                        ? "text-green-700 border-green-300 bg-green-50 cursor-default"
-                                        : "text-indigo-700 border-indigo-300 bg-indigo-50 hover:bg-indigo-100"
-                                    }`}
-                                  >
-                                    {paidHashes.has(r.row_hash)
-                                      ? "追加した"
-                                      : "払った"}
-                                  </button>
-                                  <button
-                                    onClick={() => handleFreeEntry(r)}
-                                    disabled={paidHashes.has(r.row_hash)}
-                                    className={`rounded px-3 py-1 text-sm border whitespace-nowrap ${
-                                      paidHashes.has(r.row_hash)
-                                        ? "text-green-700 border-green-300 bg-green-50 cursor-default"
-                                        : "text-blue-700 border-blue-300 bg-blue-50 hover:bg-blue-100"
-                                    }`}
-                                  >
-                                    {paidHashes.has(r.row_hash)
-                                      ? "追加した"
-                                      : "無料"}
-                                  </button>
-                                </div>
+                        </thead>
+                        <tbody>
+                          {filteredRows.length === 0 ? (
+                            <tr>
+                              <td
+                                colSpan={2 + displayHeaders.length}
+                                className="px-3 py-4 text-center text-gray-500"
+                              >
+                                データがありません
                               </td>
                             </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                          ) : (
+                            filteredRows.map((r) => (
+                              <tr
+                                key={r.row_hash || r.row_number}
+                                className="odd:bg-white even:bg-gray-50"
+                              >
+                                <td className="px-3 py-2 text-gray-700 whitespace-nowrap">
+                                  {r.row_number}
+                                </td>
+                                {displayHeaders.map((h, idx) => (
+                                  <td
+                                    key={`${r.row_number}-${idx}`}
+                                    className="px-3 py-2 text-gray-800 whitespace-nowrap"
+                                  >
+                                    {String(
+                                      r.data?.[h || `col_${idx + 1}`] ?? ""
+                                    )}
+                                  </td>
+                                ))}
+                                <td className="px-3 py-2 text-gray-800 whitespace-nowrap">
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => handleMarkPaid(r)}
+                                      disabled={paidHashes.has(r.row_hash)}
+                                      className={`rounded px-3 py-1 text-sm border ${
+                                        paidHashes.has(r.row_hash)
+                                          ? "text-green-700 border-green-300 bg-green-50 cursor-default"
+                                          : "text-indigo-700 border-indigo-300 bg-indigo-50 hover:bg-indigo-100"
+                                      }`}
+                                    >
+                                      {paidHashes.has(r.row_hash)
+                                        ? "追加した"
+                                        : "払った"}
+                                    </button>
+                                    <button
+                                      onClick={() => handleFreeEntry(r)}
+                                      disabled={paidHashes.has(r.row_hash)}
+                                      className={`rounded px-3 py-1 text-sm border whitespace-nowrap ${
+                                        paidHashes.has(r.row_hash)
+                                          ? "text-green-700 border-green-300 bg-green-50 cursor-default"
+                                          : "text-blue-700 border-blue-300 bg-blue-50 hover:bg-blue-100"
+                                      }`}
+                                    >
+                                      {paidHashes.has(r.row_hash)
+                                        ? "追加した"
+                                        : "無料"}
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                   {/* Paid participants list */}
                   <div className="mt-10">
                     <div className="mb-2 flex items-center justify-between">
