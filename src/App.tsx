@@ -478,6 +478,25 @@ function CheckinsView() {
 
   const totalAbsent = totalCheckedIn - totalActual;
 
+  // Calculate totals by category
+  const totalActualAdults = rows.reduce((sum, row) => {
+    const adult = parseInt(String(row.adult || 0), 10) || 0;
+    const absentAdult = parseInt(String(row.absent_adults || 0), 10) || 0;
+    return sum + (adult - absentAdult);
+  }, 0);
+
+  const totalActualChildren = rows.reduce((sum, row) => {
+    const child = parseInt(String(row.child || 0), 10) || 0;
+    const absentChild = parseInt(String(row.absent_children || 0), 10) || 0;
+    return sum + (child - absentChild);
+  }, 0);
+
+  const totalActualInfants = rows.reduce((sum, row) => {
+    const infant = parseInt(String(row.infant || 0), 10) || 0;
+    const absentInfant = parseInt(String(row.absent_infants || 0), 10) || 0;
+    return sum + (infant - absentInfant);
+  }, 0);
+
   // Absence Modal Component state
   const [absentAdults, setAbsentAdults] = useState(0);
   const [absentChildren, setAbsentChildren] = useState(0);
@@ -820,6 +839,45 @@ function CheckinsView() {
           </table>
         </div>
       )}
+      
+      {/* Summary Section */}
+      {!loading && !error && rows.length > 0 && (
+        <div className="mt-4 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
+          <h3 className="text-sm font-semibold text-indigo-900 mb-3">
+            参加者内訳 (Summary)
+          </h3>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="text-center">
+              <div className="text-xs text-indigo-700 font-medium mb-1">
+                大人
+              </div>
+              <div className="text-2xl font-bold text-indigo-900">
+                {totalActualAdults}
+              </div>
+              <div className="text-xs text-indigo-600 mt-1">名</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xs text-indigo-700 font-medium mb-1">
+                こども
+              </div>
+              <div className="text-2xl font-bold text-indigo-900">
+                {totalActualChildren}
+              </div>
+              <div className="text-xs text-indigo-600 mt-1">名</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xs text-indigo-700 font-medium mb-1">
+                赤ちゃん
+              </div>
+              <div className="text-2xl font-bold text-indigo-900">
+                {totalActualInfants}
+              </div>
+              <div className="text-xs text-indigo-600 mt-1">名</div>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <AbsenceModal />
     </div>
   );
